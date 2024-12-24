@@ -14,4 +14,16 @@ public class Ex2Test {
         assertFalse(Cell.isNumber("123.sbc"));
         assertFalse(Cell.isNumber(".123"));
     }
+    @Test
+    public void testIsForm() {
+        assertTrue(Cell.isForm("=-2.99*100"));
+        assertTrue(Cell.isForm("=(2)"));
+        assertTrue(Cell.isForm("=(2)*9-10+12"));
+        assertTrue(Cell.isForm("=((-2))"));
+
+        assertFalse(Cell.isForm("==-2.99*100"));
+        assertFalse(Cell.isForm("=)2("));
+        assertFalse(Cell.isForm("-990="));
+        assertFalse(Cell.isForm("=-2.99*+100"));
+    }
 }
