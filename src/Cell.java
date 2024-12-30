@@ -45,11 +45,18 @@ public class Cell {
         }
         return true;
     }
-        public static boolean isText(String text) {
+    public static boolean isText(String text) {
         if(text == null || text.trim().isEmpty())
             return false;
         if(!isNumber(text) && !isForm(text))
             return true;
         return false;
+        }
+        public static Double computeForm(String Form) {
+        if(!isForm(Form))
+            return null;
+            Stack<Character> operators = new Stack<>();
+            String copy = Form;
+
         }
 }
