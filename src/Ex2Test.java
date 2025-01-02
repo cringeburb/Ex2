@@ -17,6 +17,7 @@ public class Ex2Test {
     @Test
     public void testIsForm() {
         assertTrue(SCell.isForm("=-2.99*100"));
+        assertTrue(SCell.isForm("=(((((-2.99)))))"));
         assertTrue(SCell.isForm("=(2)"));
         assertTrue(SCell.isForm("=(2)*9-10+12"));
         assertTrue(SCell.isForm("=((-2))"));

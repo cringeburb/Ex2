@@ -57,6 +57,7 @@ public class Ex2Sheet implements Sheet {
     public void set(int x, int y, String s) {
         Cell c = new SCell(s);
         table[x][y] = c;
+
         // Add your code here
 
         /////////////////////
@@ -72,9 +73,7 @@ public class Ex2Sheet implements Sheet {
     @Override
     public boolean isIn(int xx, int yy) {
         boolean ans = xx>=0 && yy>=0;
-        // Add your code here
-
-        /////////////////////
+        ans = xx<=width() && yy<=height();
         return ans;
     }
 
@@ -103,11 +102,20 @@ public class Ex2Sheet implements Sheet {
 
     @Override
     public String eval(int x, int y) {
+        CellEntry nigga = new CellEntry(x,y);
+        CellEntry jigaboo = new CellEntry(x,y);
         String ans = null;
         if(get(x,y)!=null) {ans = get(x,y).toString();}
-        // Add your code here
-
-        /////////////////////
+       for(int i = 0; i<ans.length()-1;i++)
+       {
+           nigga.setData(ans.substring(i,i+1));
+           jigaboo.setData(ans.substring(i+1,i+2));
+           if(nigga.isValid())
+               return eval(Character.digit(ans.charAt(i) , 10),Character.digit(ans.charAt(i+1) , 10));
+           if(jigaboo.isValid())
+               return eval(Character.digit(ans.charAt(i) , 10),Character.digit(ans.charAt(i+2) , 10));
+       }
         return ans;
         }
+
 }

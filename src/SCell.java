@@ -28,6 +28,7 @@ public class SCell implements Cell {
 public void setData(String s) {
         // Add your code here
         line = s;
+
         /////////////////////
     }
     @Override
@@ -104,6 +105,76 @@ public void setData(String s) {
         String left = form.substring(0, lastop);
         String right = form.substring(lastop + 1);
         return isForm('=' + left) && isForm('=' + right);
+    }
+    public static boolean isText (String text) {
+        if(!isForm(text) && !isNumber(text))
+            return true;
+        return false;
+    }
+    public double computeForm(String text) {
+
+    }
+    public static char findMainOperator(String formula) {
+        return findMainOperator(formula, 0, formula.length() - 1);
+    }
+
+    private static char findMainOperator(String formula, int start, int end) {
+        //if the formula segment is a single character, return it
+        if (start == end) {
+            return formula.charAt(start);
+        }
+
+        int mainOperatorPosition = -1;
+        int lowestPrecedence = Integer.MAX_VALUE;
+        int parenthesesCount = 0;
+
+        // Traverse the formula segment
+        for (int i = start; i <= end; i++) {
+            char c = formula.charAt(i);
+
+            if (c == '(') {
+                parenthesesCount++;
+            } else if (c == ')') {
+                parenthesesCount--;
+            } else if (parenthesesCount == 0 && isOperator(c)) {
+                int precedence = getOperatorPrecedence(c);
+                if (precedence <= lowestPrecedence) {
+                    lowestPrecedence = precedence;
+                    mainOperatorPosition = i;
+                }
+            }
+        }
+
+        // If no operator is found in the current segment, return the character at the start position
+        if (mainOperatorPosition == -1) {
+            return formula.charAt(start);
+        }
+
+        // Recursively process the left and right segments of the formula
+        char leftOperator = findMainOperator(formula, start, mainOperatorPosition - 1);
+        char rightOperator = findMainOperator(formula, mainOperatorPosition + 1, end);
+
+        // Return the main operator for the current segment
+        return formula.charAt(mainOperatorPosition);
+    }
+
+    // Helper method to check if a character is an operator
+    private static boolean isOperator(char c) {
+        return c == '+' || c == '-' || c == '*' || c == '/';
+    }
+
+    // Helper method to get the precedence of an operator
+    private static int getOperatorPrecedence(char operator) {
+        switch (operator) {
+            case '+':
+            case '-':
+                return 1; // Addition and subtraction have the lowest precedence
+            case '*':
+            case '/':
+                return 2; // Multiplication and division have higher precedence than addition and subtraction
+            default:
+                return Integer.MAX_VALUE; // Unknown operator has the highest precedence
+        }
     }
 
 }
