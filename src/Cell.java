@@ -1,62 +1,41 @@
-import java.util.Stack;
+/**
+ * ArielU. Intro2CS, Ex2: https://docs.google.com/document/d/1-18T-dj00apE4k1qmpXGOaqttxLn-Kwi/edit?usp=sharing&ouid=113711744349547563645&rtpof=true&sd=true
+ * DO NOT CHANGE THIS INTERFACE!!
+ * This interface represents a spreadsheet entry for Ex2:
+ * Each spreadsheet entry (aka a Cell) which can be:
+ * a number (Double), a String (Text), or a form, the data of each cell is represented as a String (e.g., "abc", "4.2", "=2+3*2", "=A1*(3-A2)".
+ */
+public interface Cell {
+    /**
+     * Return the input text (aka String) this cell was init by (without any computation).
+     * @return
+     */
+    String getData();
 
-public class Cell {
-    public static boolean isNumber(String text) {
-        if (text.indexOf(".") != text.lastIndexOf('.') || text.indexOf("-") != text.lastIndexOf('-'))
-            return false;
-        if (text.indexOf("-") != -1 && text.indexOf("-") != 0 || text.indexOf(".") == 0)
-            return false;
-        for (int i = 0; i < text.length(); i++) {
-            if (text.charAt(i) != '-' && text.charAt(i) != '.' && Character.isDigit(text.charAt(i)) == false)
-                return false;
-        }
-        return true;
-    }
+/** Changes the underline string of this cell
+ *  */
+    void setData(String s);
 
-    public static boolean isForm(String text) {
-        String operators = "+-*/";
-        if (text == null || text.trim().isEmpty()) //checks empty strings or just spaces
-            return false;
-        int balance = 0;
-        if (text.indexOf("=") != text.lastIndexOf('=') || text.indexOf("=") != 0)//an equation cannot have 2 '=' symbols, and it has to be in the beginning of the formula
-            return false;
-        for (int i = 0; i < text.length(); i++) {
-            if (text.charAt(i) != '=' && text.charAt(i) != '-' && text.charAt(i) != '.'
-                    && Character.isDigit(text.charAt(i)) == false
-                    && text.charAt(i) != '+' && text.charAt(i) != '('
-                    && text.charAt(i) != ')' && text.charAt(i) != '*'
-                    && text.charAt(i) != '/'
-                    && Character.isLetter(text.charAt(i))) //checks that all given characters are valid
-                return false;
-        }
-        for (int i = 0; i < text.length(); i++) {
-            char c = text.charAt(i);
-            if (c == '(') balance++;
-            if (c == ')') balance--;
-            if (balance < 0) return false; // Closing parenthesis before opening
-        }
-        if (balance != 0) return false;// Unmatched parentheses
 
-        for (int i = 1; i < text.length(); i++) {
-            // Check if both the current and previous characters are operators
-            if (operators.indexOf(text.charAt(i)) != -1 && operators.indexOf(text.charAt(i - 1)) != -1) {
-                return false; // Found consecutive operators
-            }
-        }
-        return true;
-    }
-    public static boolean isText(String text) {
-        if(text == null || text.trim().isEmpty())
-            return false;
-        if(!isNumber(text) && !isForm(text))
-            return true;
-        return false;
-        }
-        public static Double computeForm(String Form) {
-        if(!isForm(Form))
-            return null;
-            Stack<Character> operators = new Stack<>();
-            String copy = Form;
+    /**
+     * Returns the type of this cell {TEXT,NUMBER, FORM, ERR_CYCLE_FORM, ERR_WRONG_FORM}
+     * @return an int value (as defined in Ex2Utils)
+     */
+    public int getType();
 
-        }
+    /**
+     * Changes the type of this Cell {TEXT,NUMBER, FORM, ERR_CYCLE_FORM, ERR_WRONG_FORM}
+     * @param t an int type value as defines in Ex2Utils.
+     */
+    public void setType(int t);
+    /**
+     * Computes the natural order of this entry (cell) in case of a number or a String =0, else 1+ the max of all dependent cells.
+     * @return an integer representing the "number of rounds" needed to compute this cell (using an iterative approach)..
+     */
+    public int getOrder();
+    /**
+     * Changes the order of this Cell
+     * @param t
+     */
+    public void setOrder(int t);
 }
