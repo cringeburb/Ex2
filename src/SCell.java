@@ -25,12 +25,13 @@ public class SCell implements Cell {
     }
 
     @Override
-public void setData(String s) {
+    public void setData(String s) {
         // Add your code here
         line = s;
 
         /////////////////////
     }
+
     @Override
     public String getData() {
         return line;
@@ -51,20 +52,20 @@ public void setData(String s) {
         // Add your code here
 
     }
+
     public static boolean isNumber(String text) {
-        if (text.indexOf(".") != text.lastIndexOf('.') || text.indexOf("-") != text.lastIndexOf('-'))
+        if(!Character.isDigit(text.charAt(0))&& text.charAt(0)!= '-') {
             return false;
-        if (text.indexOf("-") != -1 && text.indexOf("-") != 0 || text.indexOf(".") == 0)
-            return false;
-        for (int i = 0; i < text.length(); i++) {
-            if (text.charAt(i) != '-' && text.charAt(i) != '.' && Character.isDigit(text.charAt(i)) == false)
-                return false;
         }
-        return true;
+        try { Double.parseDouble(text);
+            return true; }
+        catch (NumberFormatException e)
+        { return false; }
     }
+
     public static boolean isForm(String form) {
         String operators = "+-*/";
-        int balance=0;
+        /*int balance=0;
         if (form == null || form.isEmpty()) {
             return false;
         }
@@ -105,23 +106,110 @@ public void setData(String s) {
         String left = form.substring(0, lastop);
         String right = form.substring(lastop + 1);
         return isForm('=' + left) && isForm('=' + right);
+
+         */
+        int balance = 0;
+
+        if (form == null || form.isEmpty()) {
+            return false;
+        }
+
+        // Check if the string starts with '='
+        if (form.charAt(0) != '=') {
+            return false;
+        }
+
+        // Remove the '=' at the beginning
+        form = form.substring(1);
+
+        // Base case: if the form is a single digit, return true
+        if (isNumber(form)) {
+            return true;
+        }
+
+        // Handle parentheses at the start and end
+        if (form.charAt(0) == '(' && form.charAt(form.length() - 1) == ')') {
+            return isForm('=' + form.substring(1, form.length() - 1));
+        }
+
+        // Check for consecutive operators
+        for (int i = 0; i < form.length() - 1; i++) {
+            if (operators.indexOf(form.charAt(i)) != -1 && operators.indexOf(form.charAt(i + 1)) != -1) {
+                return false;
+            }
+        }
+
+        int lastop = -1;
+        balance = 0;
+
+        // Traverse the expression from right to left to find the main operator
+        for (int i = form.length() - 1; i >= 0; i--) {
+            char c = form.charAt(i);
+            if (c == ')') {
+                balance++;
+            } else if (c == '(') {
+                balance--;
+            } else if (operators.indexOf(c) != -1 && balance <= 0) {
+                lastop = i;
+                break;
+            }
+        }
+
+        if (lastop == -1) {
+            return false;
+        }
+
+        // Split the expression and recursively validate both sides
+        String left = form.substring(0, lastop);
+        String right = form.substring(lastop + 1);
+        return isForm('=' + left) && isForm('=' + right);
+
+
+
     }
     public static boolean isText (String text) {
         if(!isForm(text) && !isNumber(text))
             return true;
         return false;
     }
-    public double computeForm(String text) {
-
+    public static Double computeForms (String form){
+        if(isForm(form))
+            return computeFormsub(form, 1,form.length()-1);
+        else
+        return -1.00;
     }
-    public static char findMainOperator(String formula) {
+    public static  double computeFormsub(String text ,int start , int end) {
+        while(start<=end && text.charAt(start)=='(' && text.charAt(end)==')'){
+            start++;
+            end--;
+        }
+       if (isNumber(text.substring(start,end+1 )))
+           return Double.parseDouble(text.substring(start,end+1));
+       String RHS,LHS;
+       int mainopindex = findMainOperator(text , start , end);
+       double LHSVAL = computeFormsub(text,start,mainopindex -1);
+       double RHSVAL = computeFormsub(text,mainopindex+1,end);
+       char mainop = text.charAt(mainopindex);
+       switch (mainop) {
+           case '+':
+               return LHSVAL + RHSVAL;
+               case '-':
+                   return LHSVAL - RHSVAL;
+                   case '*':
+                       return LHSVAL * RHSVAL;
+                       case '/':
+                           return LHSVAL / RHSVAL;
+                           default:
+                               throw new ArithmeticException("unknown operator :" + mainop);
+       }
+    }
+    public static int findMainOperator(String formula) {
         return findMainOperator(formula, 0, formula.length() - 1);
     }
-
-    private static char findMainOperator(String formula, int start, int end) {
+    private static int findMainOperator(String formula, int start, int end) {
         //if the formula segment is a single character, return it
         if (start == end) {
-            return formula.charAt(start);
+            return start;
         }
 
         int mainOperatorPosition = -1;
@@ -147,15 +235,15 @@ public void setData(String s) {
 
         // If no operator is found in the current segment, return the character at the start position
         if (mainOperatorPosition == -1) {
-            return formula.charAt(start);
+            return start;
         }
 
         // Recursively process the left and right segments of the formula
-        char leftOperator = findMainOperator(formula, start, mainOperatorPosition - 1);
-        char rightOperator = findMainOperator(formula, mainOperatorPosition + 1, end);
+        int leftOperator = findMainOperator(formula, start, mainOperatorPosition - 1);
+        int rightOperator = findMainOperator(formula, mainOperatorPosition + 1, end);
 
         // Return the main operator for the current segment
-        return formula.charAt(mainOperatorPosition);
+        return mainOperatorPosition;
     }
 
     // Helper method to check if a character is an operator
