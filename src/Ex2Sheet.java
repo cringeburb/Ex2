@@ -1,20 +1,21 @@
 import java.io.IOException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 // Add your documentation below:
 
 public class Ex2Sheet implements Sheet {
     private Cell[][] table;
-    // Add your code here
 
-    // ///////////////////
     public Ex2Sheet(int x, int y) {
         table = new SCell[x][y];
-        for(int i=0;i<x;i=i+1) {
-            for(int j=0;j<y;j=j+1) {
+        for (int i = 0; i < x; i = i + 1) {
+            for (int j = 0; j < y; j = j + 1) {
                 table[i][j] = new SCell("");
             }
         }
-        eval();
+
     }
+
     public Ex2Sheet() {
         this(Ex2Utils.WIDTH, Ex2Utils.HEIGHT);
     }
@@ -24,8 +25,10 @@ public class Ex2Sheet implements Sheet {
         String ans = Ex2Utils.EMPTY_CELL;
         // Add your code here
 
-        Cell c = get(x,y);
-        if(c!=null) {ans = c.toString();}
+        Cell c = get(x, y);
+        if (c != null) {
+            ans = c.toString();
+        }
 
         /////////////////////
         return ans;
@@ -39,9 +42,7 @@ public class Ex2Sheet implements Sheet {
     @Override
     public Cell get(String cords) {
         Cell ans = null;
-        // Add your code here
 
-        /////////////////////
         return ans;
     }
 
@@ -49,19 +50,20 @@ public class Ex2Sheet implements Sheet {
     public int width() {
         return table.length;
     }
+
     @Override
     public int height() {
         return table[0].length;
     }
+
     @Override
     public void set(int x, int y, String s) {
-        Cell c = new SCell(s);
+        SCell c = new SCell(s);
         table[x][y] = c;
 
-        // Add your code here
 
-        /////////////////////
     }
+
     @Override
     public void eval() {
         int[][] dd = depth();
@@ -72,25 +74,39 @@ public class Ex2Sheet implements Sheet {
 
     @Override
     public boolean isIn(int xx, int yy) {
-        boolean ans = xx>=0 && yy>=0;
-        ans = xx<=width() && yy<=height();
+        boolean ans = xx >= 0 && yy >= 0;
+        ans = xx <= width() && yy <= height();
         return ans;
     }
 
     @Override
     public int[][] depth() {
+        int depth = 0;
+        int count = 0;
+        int max = width() * height();
+        boolean flagC = true;
         int[][] ans = new int[width()][height()];
-        // Add your code here
+        for (int i = 0; i < width(); i++) {
+            for (int j = 0; j < height(); j++) {
+                ans[i][j] = -1;
+            }
+        }
+        for (int i = 0; i < width(); i++) {
+            for (int j = 0; j < height(); j++) {
+                if (SCell.isNumber(this.table[i][j].getData()) || SCell.isText(this.table[i][j].getData()) || canbecomputednow(i, j))
+                    ans[i][j] = 0;
+                else {
+                    depthCount(i, j, getCellName(i, j));
+                }
+            }
+        }
 
-        // ///////////////////
         return ans;
     }
 
     @Override
     public void load(String fileName) throws IOException {
-        // Add your code here
 
-        /////////////////////
     }
 
     @Override
@@ -102,20 +118,66 @@ public class Ex2Sheet implements Sheet {
 
     @Override
     public String eval(int x, int y) {
-        CellEntry nigga = new CellEntry(x,y);
-        CellEntry jigaboo = new CellEntry(x,y);
         String ans = null;
-        if(get(x,y)!=null) {ans = get(x,y).toString();}
-       for(int i = 0; i<ans.length()-1;i++)
-       {
-           nigga.setData(ans.substring(i,i+1));
-           jigaboo.setData(ans.substring(i+1,i+2));
-           if(nigga.isValid())
-               return eval(Character.digit(ans.charAt(i) , 10),Character.digit(ans.charAt(i+1) , 10));
-           if(jigaboo.isValid())
-               return eval(Character.digit(ans.charAt(i) , 10),Character.digit(ans.charAt(i+2) , 10));
-       }
+        ans = String.valueOf(SCell.computeForms(SCell.getData(x,y)));
         return ans;
+    }
+
+    public boolean canbecomputednow(int x, int y) {
+        String form = this.table[x][y].getData();
+        if (!SCell.isForm(form)) {
+            return false;
         }
+        for (int i = 0; i < form.length(); i++) {
+            if (Character.isLetter(form.charAt(i)))
+                return false;
+        }
+        return true;
+    }
+
+    // a function where I assume the formula has a cell in it ,so I can calculate the depth
+    public int depthCount(int x, int y, String visitedPath) {
+        String data = table[x][y].getData();
+
+        // If the cell contains text or a number, depth is 0
+        if (SCell.isText(data) || SCell.isNumber(data)) {
+            return 0;
+        }
+
+        // Check for self-referencing or circular references
+        String currentCell = getCellName(x, y);
+        if (visitedPath.contains("," + currentCell + ",")) {
+            throw new IllegalArgumentException("Circular reference detected at cell: " + currentCell);
+
+        }
+
+        // Add the current cell to the visited path
+        visitedPath += "," + currentCell + ",";
+
+        // Regular expression to find cell references in the formula
+        Pattern cellPattern = Pattern.compile("[A-Z]+[0-9]+");
+        Matcher matcher = cellPattern.matcher(data);
+
+        int maxDepth = 0;
+        while (matcher.find()) {
+            String cellRef = matcher.group(); // Extract the cell reference
+
+            // Convert cell reference to coordinates (x, y)
+            int refX = cellRef.charAt(0) - 'A'; // Column as 0-based index
+            int refY = Integer.parseInt(cellRef.substring(1)) - 1; // Row as 0-based index
+
+            // Recursively calculate the depth of the referenced cell
+            maxDepth = Math.max(maxDepth, 1 + depthCount(refX, refY, visitedPath));
+        }
+        return maxDepth;
+    }
+
+    // Helper function to get the cell name from coordinates
+    private String getCellName(int x, int y) {
+        char column = (char) ('A' + x);
+        int row = y + 1;
+        return column + Integer.toString(row);
+    }
+
 
 }

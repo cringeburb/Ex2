@@ -23,7 +23,6 @@ public class Ex2Test {
         assertTrue(SCell.isForm("=((-2))"));
         assertTrue(SCell.isForm("=(2+5)*7"));
         assertTrue(SCell.isForm("=(2+(5*(5-1)))*2+(3*(1/2))*12"));
-
         assertFalse(SCell.isForm("==-2.99*100"));
         assertFalse(SCell.isForm("=)2("));
         assertFalse(SCell.isForm("-990="));
@@ -35,6 +34,21 @@ public class Ex2Test {
     assertEquals(22.5,SCell.computeForms("=(((2+5)*7)-4)/2"));
     assertEquals(-1,SCell.computeForms("(-2)"));
     assertEquals(-16,SCell.computeForms("=(-2)*9-10+12"));
-    assertEquals(50,SCell.computeForms("=(2+(5*(5-1)))*2+(3*(1/2))*12"));
+    assertEquals(62,SCell.computeForms("=(2+(5*(5-1)))*2+(3*(1/2))*12"));
+    }
+    @Test
+    public void testDepth(){
+         Sheet cells = new Ex2Sheet(3, 3) ;
+         cells.set(0,0,"10");
+         cells.set(0,1,"=A1+5");
+         cells.set(1,0,"=A1*2");
+         int[][] result = cells.depth();
+        assertEquals(0,result[0][0]);
+        assertEquals(1,result[0][1]);
+        assertEquals(1,result[1][0]);
+    }
+    @Test
+    public void testEval (){
+
     }
 }

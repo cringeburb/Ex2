@@ -33,11 +33,13 @@ public class CellEntry  implements Index2D {
     public void setData(String data){
         this.data = data;
     }
+    //return the string of the y value of a given cell
     public static String convertX (int x){
         if(x>=0 && x<=26)
             return Character.toString((char)'A' + x);//if x is larger than 10 then the returned String will be 'A' and B=11 and so on.
         return null;
     }
+    //return the string of the y value of a given cell
     public static String convertY (int y){
         return String.valueOf(Character.toChars(y));
     }

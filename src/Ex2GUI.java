@@ -24,6 +24,9 @@ public class Ex2GUI {
 		table = new Ex2Sheet(Ex2Utils.WIDTH, Ex2Utils.HEIGHT);
 		testSimpleGUI(table);
 	}
+	public static Sheet getTable(){
+		return table;
+	}
 
 	/**
 	 * This function runs the main (endlees) loop of the GUI

@@ -1,13 +1,32 @@
 // Add your documentation below:
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 public class SCell implements Cell {
     private String line;
+    private String datacalc;
     private int type;
-    // Add your code here
 
     public SCell(String s) {
         // Add your code here
         setData(s);
+        datacalc = line;
+        updatetype();
+    }
+
+    public void updatetype() {
+        if (isForm(line))
+            type = 3;
+        else if (isNumber(line)) {
+            type = 2;
+
+        }
+        if (isText(line))
+            type = 1;
+        else {
+            type = -1;
+        }
     }
 
     @Override
@@ -53,159 +72,181 @@ public class SCell implements Cell {
 
     }
 
-    public static boolean isNumber(String text) {
-        if(!Character.isDigit(text.charAt(0))&& text.charAt(0)!= '-') {
-            return false;
-        }
-        try { Double.parseDouble(text);
-            return true; }
-        catch (NumberFormatException e)
-        { return false; }
-    }
-
     public static boolean isForm(String form) {
         String operators = "+-*/";
-        /*int balance=0;
-        if (form == null || form.isEmpty()) {
-            return false;
-        }
-        if(form.length()==1 && Character.isDigit(form.charAt(0))){
-            return true;
-        }
-        // Check if the string starts with '='
-        if (form.charAt(0) != '=')
-            return false;
-        form = form.substring(1);
-        if (form.charAt(0) == '(' && form.charAt(form.length() - 1) == ')')
-            return isForm('=' + form.substring(1, form.length() -1));
-        if (isNumber(form))
-            return true;
-        for (int i = 0; i < form.length(); i++) {
-            if(operators.indexOf(form.charAt(i)) != -1 && operators.indexOf(form.charAt(i+1)) != -1)
-                return false;
-        }
-
-        int lastop = -1;
-        balance = 0;
-        for (int i = form.length() - 1; i >= 0; i--) {
-            char c = form.charAt(i);
-            if (c == ')') {
-                balance++;
-            } else if (c == '(') {
-                balance--;
-            } else if (operators.indexOf(c) != -1 && balance == 0) {
-                lastop = i;
-                break;
-            }
-        }
-
-        if (lastop == -1) {
-            return false;
-        }
-        // Split the expression and recursively validate both sides
-        String left = form.substring(0, lastop);
-        String right = form.substring(lastop + 1);
-        return isForm('=' + left) && isForm('=' + right);
-
-         */
         int balance = 0;
 
-        if (form == null || form.isEmpty()) {
+        if (form == null || form.isEmpty() || form.trim().isEmpty()) {
             return false;
         }
-
+        form = form.trim();
         // Check if the string starts with '='
         if (form.charAt(0) != '=') {
             return false;
         }
-
-        // Remove the '=' at the beginning
         form = form.substring(1);
-
-        // Base case: if the form is a single digit, return true
+        //checks for instances where the formula calls another cell
+        if (Character.isLetter(form.charAt(0)) && Character.isDigit(form.charAt(1)) && form.length() == 2) {
+            return true;
+        }
+        if (Character.isLetter(form.charAt(0)) && Character.isDigit(form.charAt(1)) && Character.isDigit(form.charAt(2)) && form.length() == 3) {
+            return true;
+        }
+        // Base case: Single digit or valid number
         if (isNumber(form)) {
             return true;
         }
 
-        // Handle parentheses at the start and end
+        // Avoid stripping parentheses unless they enclose the whole expression
         if (form.charAt(0) == '(' && form.charAt(form.length() - 1) == ')') {
-            return isForm('=' + form.substring(1, form.length() - 1));
+            int balanceCheck = 0;
+            boolean fullyEnclosed = true;
+            for (int i = 0; i < form.length() - 1; i++) {
+                char c = form.charAt(i);
+                if (c == '(') balanceCheck++;
+                if (c == ')') balanceCheck--;
+                if (balanceCheck == 0 && i != form.length() - 2) {
+                    fullyEnclosed = false;
+                    break;
+                }
+            }
+            if (fullyEnclosed) {
+                return isForm('=' + form.substring(1, form.length() - 1));
+            }
         }
 
-        // Check for consecutive operators
-        for (int i = 0; i < form.length() - 1; i++) {
+        int lastOperator = -1;
+
+        // Traverse the string while maintaining balance for parentheses
+        for (int i = 0; i < form.length(); i++) {
+            char c = form.charAt(i);
+
+            if (c == '(') {
+                balance++;
+            } else if (c == ')') {
+                balance--;
+            } else if (operators.indexOf(c) != -1 && balance == 0) {
+                lastOperator = i;
+            }
+
+            // If parentheses become unbalanced, return false
+            if (balance < 0) {
+                return false;
+            }
+        }
+        for (int i = 0; i < form.length(); i++) {
             if (operators.indexOf(form.charAt(i)) != -1 && operators.indexOf(form.charAt(i + 1)) != -1) {
                 return false;
             }
         }
 
-        int lastop = -1;
-        balance = 0;
-
-        // Traverse the expression from right to left to find the main operator
-        for (int i = form.length() - 1; i >= 0; i--) {
-            char c = form.charAt(i);
-            if (c == ')') {
-                balance++;
-            } else if (c == '(') {
-                balance--;
-            } else if (operators.indexOf(c) != -1 && balance <= 0) {
-                lastop = i;
-                break;
-            }
+        // If parentheses are not balanced at the end, return false
+        if (balance != 0) {
+            return false;
         }
 
-        if (lastop == -1) {
+        // If no operator found and not a valid number, return false
+        if (lastOperator == -1) {
             return false;
         }
 
         // Split the expression and recursively validate both sides
-        String left = form.substring(0, lastop);
-        String right = form.substring(lastop + 1);
+        String left = form.substring(0, lastOperator);
+        String right = form.substring(lastOperator + 1);
+
         return isForm('=' + left) && isForm('=' + right);
-
-
-
     }
-    public static boolean isText (String text) {
-        if(!isForm(text) && !isNumber(text))
+
+    public static boolean isNumber(String str) {
+        if (str.charAt(0) == '.')
+            return false;
+        try {
+            Double.parseDouble(str);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
+        }
+    }
+
+
+    public static boolean isText(String text) {
+        if (!isForm(text) && !isNumber(text))
             return true;
         return false;
     }
-    public static Double computeForms (String form){
-        if(isForm(form))
-            return computeFormsub(form, 1,form.length()-1);
-        else
-        return -1.00;
+
+    public static Double computeForms(String form) {
+        String processedForm = form;
+
+        // Regular expression to match cell references like A1, B12, or AB123
+        Pattern cellPattern = Pattern.compile("[A-Z]+[0-9]+");
+        Matcher matcher = cellPattern.matcher(form);
+
+        while (matcher.find()) {
+            String cellRef = matcher.group(); // Extract the cell reference, e.g., "A11"
+
+            // Get the value of the referenced cell
+            String cellValue =getData(cellRef);// Default to "0" if undefined
+
+
+            // Check for nested formulas and compute them recursively
+            if (isForm(cellValue)) {
+                cellValue = computeForms(cellValue).toString();
+            }
+
+            // Replace the cell reference with its computed value in the formula
+            processedForm = processedForm.replace(cellRef, cellValue);
+        }
+
+        // Compute the processed formula
+        if (isForm(processedForm)) {
+            return computeFormsub(processedForm, 1, processedForm.length() - 1);
+        } else if (isNumber(processedForm)) {
+            return Double.parseDouble(processedForm);
+        } else {
+            return -1.00; // Invalid formula
+        }
     }
-    public static  double computeFormsub(String text ,int start , int end) {
-        while(start<=end && text.charAt(start)=='(' && text.charAt(end)==')'){
+    //Help method to find the value of a given cell in a formula
+    public static String getData (String s){
+        int x = s.charAt(0)- 'A';
+        int y = Integer.parseInt(s.substring(1,s.length()-1));
+        return Ex2GUI.getTable().value(x,y);
+    }
+    //Same method just for the coordinates instead of the strings
+    public static String getData (int x , int y){
+        return Ex2GUI.getTable().value(x,y);
+    }
+    public static double computeFormsub(String text, int start, int end) {
+        while (start <= end && text.charAt(start) == '(' && text.charAt(end) == ')') {
             start++;
             end--;
         }
-       if (isNumber(text.substring(start,end+1 )))
-           return Double.parseDouble(text.substring(start,end+1));
-       String RHS,LHS;
-       int mainopindex = findMainOperator(text , start , end);
-       double LHSVAL = computeFormsub(text,start,mainopindex -1);
-       double RHSVAL = computeFormsub(text,mainopindex+1,end);
-       char mainop = text.charAt(mainopindex);
-       switch (mainop) {
-           case '+':
-               return LHSVAL + RHSVAL;
-               case '-':
-                   return LHSVAL - RHSVAL;
-                   case '*':
-                       return LHSVAL * RHSVAL;
-                       case '/':
-                           return LHSVAL / RHSVAL;
-                           default:
-                               throw new ArithmeticException("unknown operator :" + mainop);
-       }
+        if (isNumber(text.substring(start, end + 1)))
+            return Double.parseDouble(text.substring(start, end + 1));
+        String RHS, LHS;
+        int mainopindex = findMainOperator(text, start, end);
+        double LHSVAL = computeFormsub(text, start, mainopindex - 1);
+        double RHSVAL = computeFormsub(text, mainopindex + 1, end);
+        char mainop = text.charAt(mainopindex);
+        switch (mainop) {
+            case '+':
+                return LHSVAL + RHSVAL;
+            case '-':
+                return LHSVAL - RHSVAL;
+            case '*':
+                return LHSVAL * RHSVAL;
+            case '/':
+                return LHSVAL / RHSVAL;
+            default:
+                throw new ArithmeticException("unknown operator :" + mainop);
+        }
     }
+
     public static int findMainOperator(String formula) {
         return findMainOperator(formula, 0, formula.length() - 1);
     }
+
     private static int findMainOperator(String formula, int start, int end) {
         //if the formula segment is a single character, return it
         if (start == end) {
@@ -264,5 +305,16 @@ public class SCell implements Cell {
                 return Integer.MAX_VALUE; // Unknown operator has the highest precedence
         }
     }
+
+    // Helper method which finds a cell reference in another cell's formula
+    public static boolean hasCell (String s){
+        for(int i = 0 ; i<s.length();i++){
+            if( s.charAt(i)=='e' && !Character.isDigit(s.charAt(i-1))||Character.isLetter(s.charAt(i))
+            && Character.isDigit(s.charAt(i+1)))
+                return true;
+            }
+        return false;
+    }
+
 
 }
