@@ -38,6 +38,18 @@ public interface Cell {
      * @param t
      */
     public void setOrder(int t);
-    public String getComputedValue();
-    public void setComputedValue(String value);
+    // Get the formula or the data in the cell
+    String getFormula();
+
+    // Set the formula or data in the cell
+    void setFormula(String formula);
+
+    // Get the computed value (result of evaluating the formula)
+    String getComputedValue();
+
+    // Set the computed value for the cell
+    void setComputedValue(String computedValue);
+    public int updatetype();
+
+
 }

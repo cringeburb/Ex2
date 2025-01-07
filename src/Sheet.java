@@ -123,4 +123,5 @@ public interface Sheet {
      * @throws IOException an exception might be throed if the file can not be loaded.
      */
     public void load(String fileName) throws IOException;
+
 }
