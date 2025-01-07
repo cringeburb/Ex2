@@ -1,4 +1,6 @@
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 // Add your documentation below:
@@ -6,10 +8,11 @@ import java.util.regex.Pattern;
 public class Ex2Sheet implements Sheet {
     private Cell[][] table;
 
+
     public Ex2Sheet(int x, int y) {
         table = new SCell[x][y];
-        for (int i = 0; i < x; i = i + 1) {
-            for (int j = 0; j < y; j = j + 1) {
+        for (int i = 0; i < x; i++) {
+            for (int j = 0; j < y; j++) {
                 table[i][j] = new SCell("");
             }
         }
@@ -23,14 +26,25 @@ public class Ex2Sheet implements Sheet {
     @Override
     public String value(int x, int y) {
         String ans = Ex2Utils.EMPTY_CELL;
-        // Add your code here
 
+        // Retrieve the cell
         Cell c = get(x, y);
+
         if (c != null) {
-            ans = c.toString();
+            // Check the cell type
+            if (c.getType() == 3) { //if c's data is a formula
+                try {
+                    double computedValue = SCell.computeForms(c.getData());
+                    ans = String.valueOf(computedValue);
+                } catch (Exception e) {
+                    ans = "#ERROR"; // Handle formula evaluation failure
+                }
+            } else {
+                // For non-formula cells, return the cell's string representation
+                ans = c.toString();
+            }
         }
 
-        /////////////////////
         return ans;
     }
 
@@ -58,18 +72,51 @@ public class Ex2Sheet implements Sheet {
 
     @Override
     public void set(int x, int y, String s) {
-        SCell c = new SCell(s);
-        table[x][y] = c;
+        if (!isIn(x, y)) return;
+
+        Cell cell = get(x, y);
+        if (cell == null) {
+            cell = new SCell();
+            table[x][y] = cell;
+        }
+
+        // Determine the type of the input
+        if (table[x][y].getData().startsWith("=")) { // It's a formula
+            cell.setType(Ex2Utils.FORM);
+            cell.setData(table[x][y].getData()); // Set the raw formula
+        } else if (SCell.isNumber(table[x][y].getData())) { // It's a number
+            cell.setType(Ex2Utils.NUMBER);
+            cell.setData(table[x][y].getData());
+        } else { // It's invalid or a plain string
+            cell.setType(Ex2Utils.ERR);
+            cell.setData(table[x][y].getData());
+        }
+
+        eval(); // Re-evaluate after setting a cell
 
 
     }
 
     @Override
     public void eval() {
-        int[][] dd = depth();
-        // Add your code here
-
-        // ///////////////////
+        for (int x = 0; x < width(); x++) {
+            for (int y = 0; y < height(); y++) {
+                Cell cell = get(x, y);
+                if (cell.getType() == Ex2Utils.FORM) {
+                    String formula = cell.getData().substring(1); // Remove '='
+                    try {
+                        double result = Double.parseDouble(eval(x,y)); // Implement this method
+                        cell.setComputedValue(String.valueOf(result));
+                    } catch (Exception e) {
+                        cell.setComputedValue("#ERR_FORM");
+                        cell.setType(Ex2Utils.ERR_FORM_FORMAT);
+                    }
+                }
+                else if (cell.getType() == Ex2Utils.NUMBER) {
+                    cell.setComputedValue(cell.getData());
+                }
+            }
+        }
     }
 
     @Override
@@ -79,30 +126,30 @@ public class Ex2Sheet implements Sheet {
         return ans;
     }
 
+
     @Override
     public int[][] depth() {
-        int depth = 0;
-        int count = 0;
-        int max = width() * height();
-        boolean flagC = true;
         int[][] ans = new int[width()][height()];
+
+        // Initialize depth matrix with -1
         for (int i = 0; i < width(); i++) {
             for (int j = 0; j < height(); j++) {
                 ans[i][j] = -1;
             }
         }
+
+        // Compute depths for all cells
         for (int i = 0; i < width(); i++) {
             for (int j = 0; j < height(); j++) {
-                if (SCell.isNumber(this.table[i][j].getData()) || SCell.isText(this.table[i][j].getData()) || canbecomputednow(i, j))
-                    ans[i][j] = 0;
-                else {
-                    depthCount(i, j, getCellName(i, j));
+                if (ans[i][j] == -1) { // Only compute if not already calculated
+                    ans[i][j] = depthCount(i, j, "");
                 }
             }
         }
 
         return ans;
     }
+
 
     @Override
     public void load(String fileName) throws IOException {
@@ -123,61 +170,39 @@ public class Ex2Sheet implements Sheet {
         return ans;
     }
 
-    public boolean canbecomputednow(int x, int y) {
-        String form = this.table[x][y].getData();
-        if (!SCell.isForm(form)) {
-            return false;
-        }
-        for (int i = 0; i < form.length(); i++) {
-            if (Character.isLetter(form.charAt(i)))
-                return false;
-        }
-        return true;
-    }
-
     // a function where I assume the formula has a cell in it ,so I can calculate the depth
-    public int depthCount(int x, int y, String visitedPath) {
-        String data = table[x][y].getData();
-
-        // If the cell contains text or a number, depth is 0
-        if (SCell.isText(data) || SCell.isNumber(data)) {
-            return 0;
+    private int depthCount(int x, int y, String path) {
+        // Check bounds
+        if (x < 0 || x >= table.length || y < 0 || y >= table[0].length) {
+            throw new IllegalArgumentException("Invalid cell coordinates: (" + x + ", " + y + ")");
         }
 
-        // Check for self-referencing or circular references
-        String currentCell = getCellName(x, y);
-        if (visitedPath.contains("," + currentCell + ",")) {
-            throw new IllegalArgumentException("Circular reference detected at cell: " + currentCell);
-
+        // Check for circular dependency
+        if (path.contains("[" + x + "," + y + "]")) {
+            return -1; // Circular dependency detected
         }
 
-        // Add the current cell to the visited path
-        visitedPath += "," + currentCell + ",";
+        String cell = table[x][y].getData();
+        if (!SCell.isForm(cell)) {
+            return 0; // Non-formula cells have depth 0
+        }
 
-        // Regular expression to find cell references in the formula
-        Pattern cellPattern = Pattern.compile("[A-Z]+[0-9]+");
-        Matcher matcher = cellPattern.matcher(data);
+        // Add current cell to path
+        path += "[" + x + "," + y + "]";
 
+        // Parse formula and calculate depth
+        ArrayList<String> dependencies = SCell.getDependencies(cell); // Adjust based on how dependencies are extracted
         int maxDepth = 0;
-        while (matcher.find()) {
-            String cellRef = matcher.group(); // Extract the cell reference
-
-            // Convert cell reference to coordinates (x, y)
-            int refX = cellRef.charAt(0) - 'A'; // Column as 0-based index
-            int refY = Integer.parseInt(cellRef.substring(1)) - 1; // Row as 0-based index
-
-            // Recursively calculate the depth of the referenced cell
-            maxDepth = Math.max(maxDepth, 1 + depthCount(refX, refY, visitedPath));
+        for (String dependency : dependencies) {
+            int refX = dependency.charAt(0) - 'A';
+            int refY = Integer.parseInt(dependency.substring(1));
+            int dependencyDepth = depthCount(refX, refY, path);
+            if (dependencyDepth == -1) {
+                return -1; // Propagate circular dependency signal
+            }
+            maxDepth = Math.max(maxDepth, dependencyDepth);
         }
-        return maxDepth;
+
+        return maxDepth + 1; // Depth is 1 + max depth of dependencies
     }
-
-    // Helper function to get the cell name from coordinates
-    private String getCellName(int x, int y) {
-        char column = (char) ('A' + x);
-        int row = y + 1;
-        return column + Integer.toString(row);
-    }
-
-
 }

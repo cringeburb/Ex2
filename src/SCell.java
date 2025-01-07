@@ -1,20 +1,30 @@
 // Add your documentation below:
 
+import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class SCell implements Cell {
     private String line;
-    private String datacalc;
+    private String ComputedValue;
     private int type;
-
+    public SCell(){
+        line = "";
+        ComputedValue = "";
+        type = Ex2Utils.TEXT;
+    }
     public SCell(String s) {
-        // Add your code here
         setData(s);
-        datacalc = line;
+        ComputedValue = line;
         updatetype();
     }
+    public String getComputedValue() {
+        return ComputedValue;
+    }
 
+    public void setComputedValue(String value) {
+        this.ComputedValue = value;
+    }
     public void updatetype() {
         if (isForm(line))
             type = 3;
@@ -45,10 +55,14 @@ public class SCell implements Cell {
 
     @Override
     public void setData(String s) {
-        // Add your code here
-        line = s;
-
-        /////////////////////
+        this.line = s.trim();
+        if (s.startsWith("=")) {
+            this.type = Ex2Utils.FORM;
+        } else if (isNumber(s)) {
+            this.type = Ex2Utils.NUMBER;
+        } else {
+            this.type = Ex2Utils.ERR_FORM_FORMAT;
+        }
     }
 
     @Override
@@ -158,8 +172,9 @@ public class SCell implements Cell {
     }
 
     public static boolean isNumber(String str) {
-        if (str.charAt(0) == '.')
+        if (str == null || str.isEmpty()) {
             return false;
+        }
         try {
             Double.parseDouble(str);
             return true;
@@ -170,9 +185,7 @@ public class SCell implements Cell {
 
 
     public static boolean isText(String text) {
-        if (!isForm(text) && !isNumber(text))
-            return true;
-        return false;
+        return !isNumber(text) && !isForm(text);
     }
 
     public static Double computeForms(String form) {
@@ -217,6 +230,7 @@ public class SCell implements Cell {
     public static String getData (int x , int y){
         return Ex2GUI.getTable().value(x,y);
     }
+
     public static double computeFormsub(String text, int start, int end) {
         while (start <= end && text.charAt(start) == '(' && text.charAt(end) == ')') {
             start++;
@@ -316,5 +330,23 @@ public class SCell implements Cell {
         return false;
     }
 
+    public static ArrayList<String> getDependencies(String formula) {
+        ArrayList<String> dependencies = new ArrayList<>();
+
+        if (formula == null || formula.isEmpty() || !isForm(formula)) {
+            return dependencies; // Return an empty list if the formula is invalid
+        }
+
+        formula = formula.substring(1); // Remove the leading '='
+        Pattern cellPattern = Pattern.compile("[A-Z]+[0-9]+"); // Regex to match cell references
+        Matcher matcher = cellPattern.matcher(formula);
+
+        while (matcher.find()) {
+            String cellRef = matcher.group(); // Extract the cell reference
+            dependencies.add(cellRef);
+        }
+
+        return dependencies;
+    }
 
 }

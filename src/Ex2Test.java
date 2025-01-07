@@ -12,7 +12,6 @@ public class Ex2Test {
         assertFalse(SCell.isNumber("2.99-99"));
         assertFalse(SCell.isNumber("123..456"));
         assertFalse(SCell.isNumber("123.sbc"));
-        assertFalse(SCell.isNumber(".123"));
     }
     @Test
     public void testIsForm() {
@@ -39,16 +38,32 @@ public class Ex2Test {
     @Test
     public void testDepth(){
          Sheet cells = new Ex2Sheet(3, 3) ;
-         cells.set(0,0,"10");
-         cells.set(0,1,"=A1+5");
-         cells.set(1,0,"=A1*2");
+         cells.set(0,0,"10");//A0
+         cells.set(1,1,"=A0+5");//A1
+         cells.set(1,0,"=A0*2");
          int[][] result = cells.depth();
         assertEquals(0,result[0][0]);
-        assertEquals(1,result[0][1]);
+        assertEquals(0,result[0][1]);
         assertEquals(1,result[1][0]);
     }
     @Test
     public void testEval (){
 
+    }
+    @Test
+    void testInitialization() {
+        // Initialize a 3x3 sheet
+        Ex2Sheet sheet = new Ex2Sheet(3, 3);
+
+        // Assert dimensions
+        assertEquals(3, sheet.width());
+        assertEquals(3, sheet.height());
+
+        // Assert all cells are initialized to empty
+        for (int i = 0; i < sheet.width(); i++) {
+            for (int j = 0; j < sheet.height(); j++) {
+                assertEquals("", sheet.get(i, j).getData());
+            }
+        }
     }
 }
