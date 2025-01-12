@@ -1,423 +1,486 @@
-// Add your documentation below:
+    // Add your documentation below:
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+    import java.util.ArrayList;
+    import java.util.HashSet;
+    import java.util.Set;
+    import java.util.regex.Matcher;
+    import java.util.regex.Pattern;
 
-public class SCell implements Cell {
-    private String line,CellName;
-    private String ComputedValue;
-    private int type;
-    public SCell() {
-        line = "";
-        ComputedValue = "";
-        type = Ex2Utils.TEXT;
-    }
-    public SCell (Cell s){
-        this.line=s.getFormula();
-        this.ComputedValue=s.getComputedValue();
-        this.type=s.getType();
-    }
-    public SCell(String s) {
-        setData(s);
-        ComputedValue = line;
-        updatetype();
-    }
+    public class SCell implements Cell {
+        private String originaldata;
+        private String ComputedValue;
+        private int type;
 
-    public String getComputedValue() {
-        return ComputedValue;
-    }
-
-    public void setComputedValue(String value) {
-        this.ComputedValue = value;
-    }
-
-    public int updatetype() {
-        if (isForm(line))
-            type = Ex2Utils.FORM;
-        else if (isNumber(line)) {
-            type = Ex2Utils.NUMBER;
-
-        }
-        else if (isText(line))
+        public SCell() {
+            originaldata = Ex2Utils.EMPTY_CELL;
+            ComputedValue = Ex2Utils.EMPTY_CELL;
             type = Ex2Utils.TEXT;
-        else {
-            double computedvalue = this.computeForms();
-            type = (int) computedvalue;
+
         }
-        return type;
 
+        public SCell(Cell s) {
+            this.originaldata = s.getData();
+            this.ComputedValue = s.getComputedValue();
+            this.type = s.getType();
 
-    }
+        }
 
-    @Override
-    public int getOrder() {
-        // Add your code here
+        public SCell(String s) {
+            this();
+            this.setData(s);
+        }
 
-        return 0;
-        // ///////////////////
-    }
+        public String getComputedValue() {
+            if (type == Ex2Utils.FORM) {
+                try {
+                    // Remove the '=' before computing
+                    String formula = originaldata;
+                    if (formula.startsWith("=")) {
+                        formula = formula.substring(1);
+                    }
+                    Double result = evaluateform(formula, 0, formula.length() - 1);
+                    return result.toString();
+                } catch (Exception e) {
+                    return Ex2Utils.ERR_FORM;
+                }
+            }
+            return originaldata;
+        }
 
-    //@Override
-    @Override
-    public String toString() {
-        return getData();
-    }
+        public void setComputedValue(String value) {
+            this.ComputedValue = value;
+        }
 
-    @Override
-    public void setData(String s) {
-        this.line = s.trim();
-        if (s.startsWith("=")) {
-            this.type = Ex2Utils.FORM;
-
-            // Create a Set to track the current chain of visited cells
-            Set<Cell> visitedCells = new HashSet<>();
-
-            // Compute the formula value, passing in the visitedCells set to detect cycles
-            double computedValue = this.computeForms();
-
-            // If there's a cycle, set the computed value to "ERROR_CYCLE!"
-            if (computedValue == Ex2Utils.ERR_CYCLE_FORM) {
-                this.ComputedValue = Ex2Utils.ERR_CYCLE;  // Mark as circular reference
+        public int updatetype() {
+            if (originaldata == null || originaldata.trim().isEmpty()) {
+                this.type = Ex2Utils.TEXT;
+            } else if (originaldata.startsWith("=")) {
+                this.type = Ex2Utils.FORM;
+            } else if (isNumber(originaldata)) {
+                this.type = Ex2Utils.NUMBER;
             } else {
-                this.ComputedValue = String.valueOf(computedValue);  // Store the computed value as string
+                this.type = Ex2Utils.TEXT;
+            }
+            return this.type;
+        }
+
+        @Override
+        public int getOrder() {
+            // Add your code here
+
+            return 0;
+            // ///////////////////
+        }
+
+        @Override
+        public String toString() {
+            return getData();
+        }
+
+        @Override
+        public void setData(String s) {
+            originaldata = s;
+            updatetype();
+        }
+
+        @Override
+        public String getData() {
+            return originaldata;
+        }
+
+        @Override
+        public int getType() {
+            return type;
+        }
+
+        @Override
+        public void setType(int t) {
+            type = t;
+        }
+
+        @Override
+        public void setOrder(int t) {
+            // Add your code here
+        }
+
+
+        public static boolean isForm(String form) {
+            if (form == null || form.trim().isEmpty()) {
+                return false; // Null or empty formulas are invalid
             }
 
-        } else if (isNumber(s)) {
-            this.type = Ex2Utils.NUMBER;
-            this.ComputedValue = s;  // Store the number as a string
-        } else {
-            this.type = Ex2Utils.TEXT;
-            this.ComputedValue = String.valueOf(Ex2Utils.ERR_FORM_FORMAT);  // Invalid formula stored as -2 string
-        }
-    }
+            form = form.trim();
 
+            if (form.charAt(0) != '=') {
+                return false;
+            }
 
+            form = form.substring(1); // Remove the leading '='
+            form = form.replaceAll("\\s+", ""); // Remove spaces
 
-    @Override
-    public String getData() {
-        return line;
-    }
+            // Validate parentheses balance and placement
+            int balance = 0;
+            for (int i = 0; i < form.length(); i++) {
+                char c = form.charAt(i);
+                if (c == '(') balance++;
+                if (c == ')') balance--;
+                if (balance < 0) return false;
+            }
+            if (balance != 0) return false;
 
-    @Override
-    public int getType() {
-        return type;
-    }
+            String numberPattern = "-?\\d+(\\.\\d+)?";
+            String cellReferencePattern = "[A-Z]+[0-9]+"; // Matches cell references
+            String validTerm = "(" + numberPattern + "|" + cellReferencePattern + ")";
+            String operatorPattern = "[+\\-*/]";
 
-    @Override
-    public void setType(int t) {
-        type = t;
-    }
+            String formulaPattern = "\\(*" + validTerm + "\\)*(" + operatorPattern + "\\(*" + validTerm + "\\)*)*";
 
-    @Override
-    public void setOrder(int t) {
-        // Add your code here
-
-    }
-
-    @Override
-    public String getFormula() {
-        return this.line;
-    }
-
-    @Override
-    public void setFormula(String formula) {
-        this.line = formula;
-    }
-
-    public static boolean isForm(String form) {
-        if (form == null || form.trim().isEmpty()) {
-            return false; // Null or empty formulas are invalid
+            // Check if the entire formula matches
+            return form.matches(formulaPattern);
         }
 
-        form = form.trim();
-
-        // Check if the formula starts with '='
-        if (form.charAt(0) != '=') {
-            return false;
+        public static boolean isNumber(String str) {
+            if(str.contains("+"))
+                return false;
+            if (str == null || str.isEmpty()) {
+                return false;
+            }
+            try {
+                Double.parseDouble(str);
+                return true;
+            } catch (NumberFormatException e) {
+                return false;
+            }
         }
 
-        form = form.substring(1); // Remove the leading '='
-        form = form.replaceAll("\\s+", ""); // Remove spaces
+        public static boolean isText(String text) {
+            if (text.equals(Ex2Utils.ERR_CYCLE) || text.equals(Ex2Utils.ERR_FORM) || text.equals(Ex2Utils.ERR_FORM_FORMAT)) {
+                return false;
+            }
 
-        // Validate parentheses balance and placement
-        int balance = 0;
-        for (int i = 0; i < form.length(); i++) {
-            char c = form.charAt(i);
-            if (c == '(') balance++;
-            if (c == ')') balance--;
-            if (balance < 0) return false; // Unbalanced parentheses
-        }
-        if (balance != 0) return false; // Unbalanced parentheses at the end
-
-        // Regex patterns for validation
-        String numberPattern = "-?\\d+(\\.\\d+)?"; // Matches numbers (e.g., 2, -2.99)
-        String cellReferencePattern = "[A-Z]+[0-9]+"; // Matches cell references (e.g., A0, B10)
-        String validTerm = "(" + numberPattern + "|" + cellReferencePattern + ")"; // A valid term is a number or cell reference
-        String operatorPattern = "[+\\-*/]"; // Supported operators
-
-        // Regex for matching entire formula structure
-        String formulaPattern = "\\(*" + validTerm + "\\)*(" + operatorPattern + "\\(*" + validTerm + "\\)*)*";
-
-        // Check if the entire formula matches
-        return form.matches(formulaPattern);
-    }
-
-    //Helper method that checks for cell references in a formula
-    private static boolean isValidCellReference(String ref) {
-        if (ref == null || ref.isEmpty()) {
-            return false;
-        }
-        // Match cell references like A0, B12, Z123 (letters followed by digits)
-        return ref.matches("[A-Za-z]+[0-9]+");
-    }
-
-    public static boolean isNumber(String str) {
-        if (str == null || str.isEmpty()) {
-            return false;
-        }
-        try {
-            Double.parseDouble(str);
+            if (isNumber(text) || isForm(text)) {
+                return false;
+            }
             return true;
-        } catch (NumberFormatException e) {
+        }
+
+        public static Double computeForms(String form) {
+            if (form == null || form.isEmpty()) {
+                return (double) Ex2Utils.ERR_FORM_FORMAT;
+            }
+
+            try {
+                // Remove the '=' and trim whitespace
+                String formula = form.startsWith("=") ? form.substring(1).trim() : form.trim();
+
+                // Process cell references
+                Pattern cellPattern = Pattern.compile("[A-Z][0-9]+");
+                Matcher matcher = cellPattern.matcher(formula);
+                StringBuffer processedFormula = new StringBuffer();
+
+                while (matcher.find()) {
+                    String cellRef = matcher.group();
+                    int col = cellRef.charAt(0) - 'A';
+                    int row = Integer.parseInt(cellRef.substring(1));
+
+                    Cell referencedCell = Ex2Sheet.getCell(col, row);
+                    if (referencedCell == null) {
+                        matcher.appendReplacement(processedFormula, "0");
+                        continue;
+                    }
+
+                    String cellValue = referencedCell.getData();
+                    if (cellValue == null || cellValue.isEmpty()) {
+                        matcher.appendReplacement(processedFormula, "0");
+                    } else if (cellValue.startsWith("=")) {
+                        // Recursively evaluate the referenced cell
+                        Double refValue = computeForms(cellValue);
+                        matcher.appendReplacement(processedFormula, String.valueOf(refValue));
+                    } else if (isNumber(cellValue)) {
+                        matcher.appendReplacement(processedFormula, cellValue);
+                    } else {
+                        matcher.appendReplacement(processedFormula, "0");
+                    }
+                }
+                matcher.appendTail(processedFormula);
+
+                // Evaluate the processed formula
+                return evaluateform(processedFormula.toString(), 0, processedFormula.length() - 1);
+            } catch (Exception e) {
+                return (double) Ex2Utils.ERR_FORM_FORMAT;
+            }
+        }
+
+        private static Double computeFormSub(String formula, Set<String> visited) {
+            if (isNumber(formula)) {
+                return Double.parseDouble(formula);
+            }
+
+            Pattern cellPattern = Pattern.compile("[A-Z][0-9]+");
+            Matcher matcher = cellPattern.matcher(formula);
+            StringBuffer processedFormula = new StringBuffer();
+
+            while (matcher.find()) {
+                String cellRef = matcher.group();
+
+                // Check for circular dependency
+                if (visited.contains(cellRef)) {
+                    return (double) Ex2Utils.ERR_CYCLE_FORM;
+                }
+
+                visited.add(cellRef);
+
+                int col = cellRef.charAt(0) - 'A';
+                int row = Integer.parseInt(cellRef.substring(1));
+                Cell cell = Ex2Sheet.getCell(col, row);
+
+                if (cell == null || cell.getData() == null) {
+                    matcher.appendReplacement(processedFormula, "0");
+                    continue;
+                }
+
+                String cellValue = cell.getData();
+                if (cellValue.equals(Ex2Utils.ERR_CYCLE)) {
+                    return (double) Ex2Utils.ERR_CYCLE_FORM;
+                }
+
+                if (cellValue.startsWith("=")) {
+                    // Create new visited set with current path for recursive call
+                    Set<String> newVisited = new HashSet<>(visited);
+                    Double result = computeFormSub(cellValue.substring(1), newVisited);
+                    if (result == Ex2Utils.ERR_CYCLE_FORM) {
+                        return result;
+                    }
+                    matcher.appendReplacement(processedFormula, result.toString());
+                } else if (isNumber(cellValue)) {
+                    matcher.appendReplacement(processedFormula, cellValue);
+                } else {
+                    matcher.appendReplacement(processedFormula, "0");
+                }
+
+                visited.remove(cellRef);
+            }
+            matcher.appendTail(processedFormula);
+
+            try {
+                return evaluateform(processedFormula.toString(), 0, processedFormula.length() - 1);
+            } catch (Exception e) {
+                return (double) Ex2Utils.ERR_FORM_FORMAT;
+            }
+        }
+
+        private static boolean hasCircularDependency(String formula, Set<String> visited) {
+            Pattern cellPattern = Pattern.compile("[A-Z][0-9]+");
+            Matcher matcher = cellPattern.matcher(formula);
+
+            while (matcher.find()) {
+                String cellRef = matcher.group();
+
+                // Check for self-reference or circular dependency
+                if (visited.contains(cellRef)) {
+                    return true;
+                }
+
+                visited.add(cellRef);
+
+                int col = cellRef.charAt(0) - 'A';
+                int row = Integer.parseInt(cellRef.substring(1));
+                Cell cell = Ex2Sheet.getCell(col, row);
+
+                if (cell != null && cell.getData() != null && cell.getData().startsWith("=")) {
+                    String cellFormula = cell.getData().substring(1);
+                    if (hasCircularDependency(cellFormula, new HashSet<>(visited))) {
+                        return true;
+                    }
+                }
+
+                visited.remove(cellRef);
+            }
+
             return false;
         }
-    }
 
 
-    public static boolean isText(String text) {
-        return !isNumber(text) && !isForm(text);
-    }
 
-    public  Double computeForms() {
-        if (this.ComputedValue == null || ComputedValue.isEmpty())
-            return (double) Ex2Utils.ERR_FORM_FORMAT; // Treat empty or null formula as invalid
+        public static double evaluateform(String text, int start, int end) {
+            String expr = text.substring(start, end + 1).trim();
 
-        if (!isForm(ComputedValue) && !isNumber(ComputedValue)) {
-            return (double) Ex2Utils.ERR_FORM_FORMAT; // Invalid formula syntax
-        }
-
-        ComputedValue = ComputedValue.trim();
-        return computeForms(new HashSet<>());
-    }
-
-    public double computeForms(Set<Cell> visitedCells) {
-        // If this cell is already in the visited set, it's a circular reference
-        if (visitedCells.contains(this)) {
-            this.setComputedValue(Ex2Utils.ERR_CYCLE);  // Mark as circular reference
-            return Ex2Utils.ERR_CYCLE_FORM;  // Return the circular reference error
-        }
-
-        // Add this cell to the visited cells set to track the current evaluation chain
-        visitedCells.add(this);
-
-        double result = 0;
-        try {
-            String formula = this.getData().substring(1); // Remove '=' from the formula
-            // Resolve cell references (if any)
-            String resolvedFormula = resolveCellReferences(formula, visitedCells);
-
-            // Now evaluate the resolved formula
-            result = computeFormsub(resolvedFormula, 0, resolvedFormula.length() - 1);
-            this.setComputedValue(String.valueOf(result));  // Store computed value
-
-        } catch (Exception e) {
-            // Handle exceptions, like invalid formulas
-            this.setComputedValue(Ex2Utils.ERR_FORM);
-            result = Ex2Utils.ERR_FORM_FORMAT;
-        } finally {
-            // Remove the cell from the visited set after evaluation
-            visitedCells.remove(this);
-        }
-
-        return result;
-    }
-
-
-    //Helper method to find the value of a given cell in a formula
-    public double computeFormsub(String text, int start, int end) {
-        // Remove surrounding parentheses
-        while (start <= end && text.charAt(start) == '(' && text.charAt(end) == ')') {
-            start++;
-            end--;
-        }
-
-        // Handle unary negative numbers
-        if (start <= end && text.charAt(start) == '-') {
-            if (start == end) { // Single negative number like "-2"
-                return Double.parseDouble(text.substring(start, end + 1));
+            // Handle empty expression
+            if (expr.isEmpty()) {
+                return 0;
             }
-            // Negate the rest of the subexpression
-            return -computeFormsub(text, start + 1, end);
-        }
 
-        int mainOpIndex = -1;
-        int parenCount = 0;
-        int lowestPrecedence = Integer.MAX_VALUE;
+            // Base case: if it's a number
+            if (isNumber(expr)) {
+                return Double.parseDouble(expr);
+            }
 
-        // Identify the main operator considering precedence
-        for (int i = start; i <= end; i++) {
-            char c = text.charAt(i);
+            // Handle parentheses first
+            while (expr.startsWith("(") && expr.endsWith(")")) {
+                String inner = expr.substring(1, expr.length() - 1).trim();
+                if (!inner.isEmpty()) {
+                    expr = inner;
+                } else {
+                    break;
+                }
+            }
 
-            if (c == '(') {
-                parenCount++; // Entering a parenthesis
-            } else if (c == ')') {
-                parenCount--; // Exiting a parenthesis
-            } else if (parenCount == 0) { // Outside parentheses
-                int precedence = getOperatorPrecedence(c);
-                if (precedence > 0 && precedence <= lowestPrecedence) {
+            // Handle unary minus
+            if (expr.startsWith("-")) {
+                String rest = expr.substring(1).trim();
+                if (isNumber(rest)) {
+                    return Double.parseDouble(expr);
+                }
+                return -evaluateform(rest, 0, rest.length() - 1);
+            }
+
+            // Find the last operator with lowest precedence
+            int mainOpIndex = -1;
+            int parenCount = 0;
+            int lowestPrecedence = 1;  // Start with multiplication/division precedence
+
+            // Scan for + and - first (lower precedence)
+            for (int i = expr.length() - 1; i >= 0; i--) {
+                char c = expr.charAt(i);
+                if (c == ')') parenCount++;
+                else if (c == '(') parenCount--;
+                else if (parenCount == 0 && (c == '+' || c == '-')) {
                     mainOpIndex = i;
-                    lowestPrecedence = precedence;
+                    break;
                 }
+            }
+
+            // If no + or -, scan for * and /
+            if (mainOpIndex == -1) {
+                for (int i = expr.length() - 1; i >= 0; i--) {
+                    char c = expr.charAt(i);
+                    if (c == ')') parenCount++;
+                    else if (c == '(') parenCount--;
+                    else if (parenCount == 0 && (c == '*' || c == '/')) {
+                        mainOpIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            // If no operator found
+            if (mainOpIndex == -1) {
+                return Double.parseDouble(expr);
+            }
+
+            // Split and evaluate parts
+            String leftExpr = expr.substring(0, mainOpIndex).trim();
+            String rightExpr = expr.substring(mainOpIndex + 1).trim();
+
+            // Evaluate both sides
+            double leftVal = leftExpr.isEmpty() ? 0 : evaluateform(leftExpr, 0, leftExpr.length() - 1);
+            double rightVal = evaluateform(rightExpr, 0, rightExpr.length() - 1);
+
+            // Apply operator
+            char operator = expr.charAt(mainOpIndex);
+            switch (operator) {
+                case '+': return leftVal + rightVal;
+                case '-': return leftVal - rightVal;
+                case '*': return leftVal * rightVal;
+                case '/':
+                    if (rightVal == 0) throw new ArithmeticException("Division by zero");
+                    return leftVal / rightVal;
+                default:
+                    throw new IllegalArgumentException("Invalid operator");
             }
         }
 
-        // If no operator is found, the text should be a number
-        if (mainOpIndex == -1) {
-            if (isNumber(text.substring(start, end + 1))) {
-                return Double.parseDouble(text.substring(start, end + 1));
-            }
-            throw new IllegalArgumentException("Invalid subexpression: " + text.substring(start, end + 1));
-        }
-
-        // Split the expression into LHS and RHS
-        double lhs = computeFormsub(text, start, mainOpIndex - 1);
-        double rhs = computeFormsub(text, mainOpIndex + 1, end);
-        char mainOp = text.charAt(mainOpIndex);
-
-        // Perform the operation
-        switch (mainOp) {
-            case '+':
-                return lhs + rhs;
-            case '-':
-                return lhs - rhs;
-            case '*':
-                return lhs * rhs;
-            case '/':
-                if (rhs == 0) {
-                    throw new ArithmeticException("Division by zero");
-                }
-                return lhs / rhs;
-            default:
-                throw new ArithmeticException("Unknown operator: " + mainOp);
-        }
-    }
-
-    // Helper to determine operator precedence
-    private static int getOperatorPrecedence(char op) {
-        switch (op) {
-            case '+':
-            case '-':
-                return 1; // Lowest precedence
-            case '*':
-            case '/':
-                return 2; // Higher precedence
-            default:
-                return -1; // Not an operator
-        }
-    }
 
 
-    public static int findMainOperator(String formula) {
-        return findMainOperator(formula, 0, formula.length() - 1);
-    }
-
-    private static int findMainOperator(String formula, int start, int end) {
-        //if the formula segment is a single character, return it
-        if (start == end) {
-            return start;
-        }
-
-        int mainOperatorPosition = -1;
-        int lowestPrecedence = Integer.MAX_VALUE;
-        int parenthesesCount = 0;
-
-        // Traverse the formula segment
-        for (int i = start; i <= end; i++) {
-            char c = formula.charAt(i);
-
-            if (c == '(') {
-                parenthesesCount++;
-            } else if (c == ')') {
-                parenthesesCount--;
-            } else if (parenthesesCount == 0 && isOperator(c)) {
-                int precedence = getOperatorPrecedence(c);
-                if (precedence <= lowestPrecedence) {
-                    lowestPrecedence = precedence;
-                    mainOperatorPosition = i;
-                }
+        private static int getOperatorPrecedence(char op) {
+            switch (op) {
+                case '+':
+                case '-':
+                    return 2;  // Lower precedence
+                case '*':
+                case '/':
+                    return 1;  // Higher precedence
+                default:
+                    return 3;  // Lowest precedence for other characters
             }
         }
 
-        // If no operator is found in the current segment, return the character at the start position
-        if (mainOperatorPosition == -1) {
-            return start;
+
+
+
+        private static void markCellsAsCycle(Set<String> callStack) {
+            for (String cellRef : callStack) {
+                int cellRefX = cellRef.charAt(0) - 'A';
+                int cellRefY = Integer.parseInt(cellRef.substring(1));
+                Cell cell = Ex2Sheet.getCell(cellRefX, cellRefY);
+
+                // Mark the cell as ERR_CYCLE_FORM and set its data to "ERROR_CYCLE!"
+                cell.setData(Ex2Utils.ERR_CYCLE);
+                cell.setComputedValue(Ex2Utils.ERR_CYCLE);
+                cell.setType(Ex2Utils.ERR_CYCLE_FORM);
+
+                // Debugging: Print the cell's type and data
+                System.out.println("Marked cell " + cellRef + " as ERR_CYCLE_FORM. Type: " + cell.getType() + ", Data: " + cell.getData());
+            }
         }
 
-        // Recursively process the left and right segments of the formula
-        int leftOperator = findMainOperator(formula, start, mainOperatorPosition - 1);
-        int rightOperator = findMainOperator(formula, mainOperatorPosition + 1, end);
+        public static int findMainOperator(String formula) {
+            return findMainOperator(formula, 0, formula.length() - 1);
+        }
 
-        // Return the main operator for the current segment
-        return mainOperatorPosition;
-    }
+        private static int findMainOperator(String formula, int start, int end) {
+            //if the formula segment is a single character, return it
+            if (start == end) {
+                return start;
+            }
 
-    // Helper method to check if a character is an operator
-    private static boolean isOperator(char c) {
-        return c == '+' || c == '-' || c == '*' || c == '/';
-    }
+            int mainOperatorPosition = -1;
+            int lowestPrecedence = Integer.MAX_VALUE;
+            int parenthesesCount = 0;
 
-    public  ArrayList<String> getDependencies(String formula) {
-        ArrayList<String> dependencies = new ArrayList<>();
+            for (int i = start; i <= end; i++) {
+                char c = formula.charAt(i);
 
-        // Validate the input formula
-        if (formula == null || formula.isEmpty() || !isForm(formula)) {
+                if (c == '(') {
+                    parenthesesCount++;
+                } else if (c == ')') {
+                    parenthesesCount--;
+                } else if (parenthesesCount == 0 && isOperator(c)) {
+                    int precedence = getOperatorPrecedence(c);
+                    if (precedence <= lowestPrecedence) {
+                        lowestPrecedence = precedence;
+                        mainOperatorPosition = i;
+                    }
+                }
+            }
+
+            // If no operator is found in the current segment, return the character at the start position
+            if (mainOperatorPosition == -1) {
+                return start;
+            }
+
+            // Recursively process the left and right segments of the formula
+            int leftOperator = findMainOperator(formula, start, mainOperatorPosition - 1);
+            int rightOperator = findMainOperator(formula, mainOperatorPosition + 1, end);
+
+            // Return the main operator for the current segment
+            return mainOperatorPosition;
+        }
+
+        // Helper method to check if a character is an operator
+        private static boolean isOperator(char c) {
+            return c == '+' || c == '-' || c == '*' || c == '/';
+        }
+
+        @Override
+        public ArrayList<String> getDependencies(String formula) {
+            ArrayList<String> dependencies = new ArrayList<>();
+            Pattern cellPattern = Pattern.compile("[A-Za-z]+[0-9]+");
+            Matcher matcher = cellPattern.matcher(formula);
+            while (matcher.find()) {
+                dependencies.add(matcher.group());
+            }
             return dependencies;
         }
 
-        // Normalize the formula
-        formula = formula.substring(1).trim().toUpperCase();
-
-        // Regex to match cell references (e.g., A0, B12)
-        Pattern cellPattern = Pattern.compile("[A-Z]+[0-9]+");
-        Matcher matcher = cellPattern.matcher(formula);
-
-        while (matcher.find()) {
-            dependencies.add(matcher.group());
-        }
-
-        return dependencies;
     }
-    public String resolveCellReferences(String formula, Set<Cell> visitedCells) {
-        // Extract all cell references (e.g., A1, B2) from the formula
-        ArrayList<String> dependencies = this.getDependencies(formula);
-
-        // Iterate through each dependency to resolve its value
-        for (String dep : dependencies) {
-            int refX = dep.charAt(0) - 'A'; // Convert letter to column index (e.g., 'A' -> 0)
-            int refY = Integer.parseInt(dep.substring(1)) - 1; // Convert row number (e.g., "1" -> 0)
-
-            // Get the referenced cell's data
-            Cell refCell = getCell(refX, refY);  // Use helper method to get a specific cell
-
-            // If the referenced cell is a formula, compute its value recursively
-            if (refCell.getType() == Ex2Utils.FORM) {
-                // Recursively evaluate the referenced cell
-                double refValue = ((SCell) refCell).computeForms(visitedCells);
-                formula = formula.replace(dep, String.valueOf(refValue));  // Replace reference with computed value
-            } else {
-                // Replace reference with the actual data (if it's not a formula)
-                formula = formula.replace(dep, refCell.getData());
-            }
-        }
-
-        return formula;  // Return the formula with all resolved references
-    }
-    // Helper method to access a specific cell from the table
-    private Cell getCell(int x, int y) {
-        return Ex2Sheet.table[x][y];  // Assuming Ex2Sheet is a static reference to the table
-    }
-
-}

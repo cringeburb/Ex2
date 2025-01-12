@@ -1,23 +1,22 @@
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class Ex2Sheet implements Sheet {
     public static Cell[][] table;
 
-
     public Ex2Sheet(int x, int y) {
         table = new SCell[x][y];
         for (int i = 0; i < x; i++) {
             for (int j = 0; j < y; j++) {
-                table[i][j] = new SCell("");
+                table[i][j] = new SCell();
             }
         }
-
     }
 
     public Ex2Sheet() {
@@ -28,20 +27,18 @@ public class Ex2Sheet implements Sheet {
     public String value(int x, int y) {
         String ans = Ex2Utils.EMPTY_CELL;
 
-        // Retrieve the cell
         Cell c = get(x, y);
-        SCell a = new SCell(c);
+
         if (c != null) {
-            // Check the cell type
-            if (c.getType() == 3) { //if c's data is a formula
+            if (c.getType() == Ex2Utils.FORM) {
                 try {
-                    double computedValue = a.computeForms();
+                    double computedValue = SCell.computeForms(c.getData());
                     ans = String.valueOf(computedValue);
                 } catch (Exception e) {
-                    ans = "#ERROR"; // Handle formula evaluation failure
+                    ans = Ex2Utils.ERR_FORM;
                 }
             } else {
-                // For non-formula cells, return the cell's string representation
+
                 ans = c.toString();
             }
         }
@@ -51,13 +48,14 @@ public class Ex2Sheet implements Sheet {
 
     @Override
     public Cell get(int x, int y) {
-        return table[x][y];
+        if(isIn(x, y))
+        {return table[x][y];}
+        return null;
     }
 
     @Override
     public Cell get(String cords) {
         Cell ans = null;
-
         return ans;
     }
 
@@ -65,68 +63,98 @@ public class Ex2Sheet implements Sheet {
     public int width() {
         return table.length;
     }
-
     @Override
     public int height() {
         return table[0].length;
     }
 
+
     @Override
     public void set(int x, int y, String s) {
-        if (!isIn(x, y)) return;
+        if (!isIn(x, y)) {
+            return;
+        }
 
+        // Get or create cell
         Cell cell = get(x, y);
         if (cell == null) {
             cell = new SCell();
             table[x][y] = cell;
         }
 
-        // Update the cell's data and type based on the input string
+        // Set the data first
         cell.setData(s);
-        SCell a = new SCell(cell);
-        if (s.startsWith("=")) { // It's a formula
+
+        // Update the cell type
+        if (s == null || s.trim().isEmpty()) {
+            cell.setType(Ex2Utils.TEXT);
+        } else if (s.startsWith("=")) {
             cell.setType(Ex2Utils.FORM);
-            // Update dependencies for the formula
-            updateDependencies(x, y, s);
-        } else if (SCell.isNumber(s)) { // It's a number
+        } else if (SCell.isNumber(s)) {
             cell.setType(Ex2Utils.NUMBER);
-            clearDependencies(x, y); // Clear dependencies since it's not a formula
-        } else { // It's an invalid string
-            cell.setType(Ex2Utils.ERR);
-            clearDependencies(x, y); // Clear dependencies for invalid input
+        } else {
+            cell.setType(Ex2Utils.TEXT);
         }
-        if( a.computeForms() == Ex2Utils.ERR_CYCLE_FORM)
-            cell.setType(Ex2Utils.ERR_CYCLE_FORM);
-
-
-        eval(); // Re-evaluate all cells to ensure correctness
-
-
     }
+
 
     @Override
     public void eval() {
+        // First, check for circular dependencies
+        int[][] depths = depth();
+
         for (int x = 0; x < width(); x++) {
             for (int y = 0; y < height(); y++) {
                 Cell cell = get(x, y);
-                if (cell.getType() == Ex2Utils.FORM) {
-                    String formula = cell.getData().substring(1); // Remove '='
-                    try {
-                        double result = Double.parseDouble(eval(x,y)); // Implement this method
-                        cell.setComputedValue(String.valueOf(result));
-                    } catch (Exception e) {
-                        cell.setComputedValue(Ex2Utils.ERR_FORM);
-                        cell.setType(Ex2Utils.ERR_FORM_FORMAT);
-                    }
+                String data = cell.getData();
+
+                // Handle empty cells
+                if (data == null || data.isEmpty()) {
+                    cell.setComputedValue(Ex2Utils.EMPTY_CELL);
+                    continue;
                 }
-                else if (cell.getType() == Ex2Utils.NUMBER) {
-                    cell.setComputedValue(cell.getData());
-                }
-                else if (cell.getType() == Ex2Utils.ERR_CYCLE_FORM) {
-                    cell.setComputedValue(Ex2Utils.ERR_CYCLE);
+
+                // Update cells with circular dependencies
+                if (depths[x][y] == -1) {
+                    cell.setData(Ex2Utils.ERR_CYCLE);
                     cell.setType(Ex2Utils.ERR_CYCLE_FORM);
+                    cell.setComputedValue(Ex2Utils.ERR_CYCLE);
+                    continue;
                 }
-                CellEntry cellEntry = new CellEntry(x,y,cell.getData());
+
+                // Handle FORM cells
+                if (data.startsWith("=")) {
+                    // Check if it's a valid formula format
+                    if (!SCell.isForm(data)) {
+                        cell.setData(Ex2Utils.ERR_FORM);
+                        cell.setType(Ex2Utils.ERR_FORM_FORMAT);
+                        cell.setComputedValue(Ex2Utils.ERR_FORM);
+                        continue;
+                    }
+
+                    try {
+                        double result = SCell.computeForms(data);
+                        if (result == Ex2Utils.ERR_CYCLE_FORM) {
+                            cell.setData(Ex2Utils.ERR_CYCLE);
+                            cell.setType(Ex2Utils.ERR_CYCLE_FORM);
+                            cell.setComputedValue(Ex2Utils.ERR_CYCLE);
+                        } else if (result == Ex2Utils.ERR_FORM_FORMAT) {
+                            cell.setData(Ex2Utils.ERR_FORM);
+                            cell.setType(Ex2Utils.ERR_FORM_FORMAT);
+                            cell.setComputedValue(Ex2Utils.ERR_FORM);
+                        } else {
+                            cell.setComputedValue(String.valueOf(result));
+                        }
+                    } catch (Exception e) {
+                        cell.setData(Ex2Utils.ERR_FORM);
+                        cell.setType(Ex2Utils.ERR_FORM_FORMAT);
+                        cell.setComputedValue(Ex2Utils.ERR_FORM);
+                    }
+                    continue;
+                }
+
+                // Handle NUMBER and TEXT cells
+                cell.setComputedValue(cell.getData());
             }
         }
     }
@@ -136,70 +164,197 @@ public class Ex2Sheet implements Sheet {
         return xx >= 0 && xx < width() && yy >= 0 && yy < height();
     }
 
-
     @Override
     public int[][] depth() {
         int[][] ans = new int[width()][height()];
-
-        // Initialize depth matrix with -1 (uncalculated)
+        // Initialize depth matrix with -2 (unprocessed)
         for (int i = 0; i < width(); i++) {
             for (int j = 0; j < height(); j++) {
-                ans[i][j] = -1;
+                ans[i][j] = -2;
             }
         }
 
         // Compute depths for all cells
         for (int i = 0; i < width(); i++) {
             for (int j = 0; j < height(); j++) {
-                if (ans[i][j] == -1) { // Compute depth only if not calculated
-                    ans[i][j] = depthCount(i, j, "");
+                if (ans[i][j] == -2) {
+                    depthCount(i, j, ans, new HashSet<>());
                 }
             }
         }
-
         return ans;
     }
 
 
-    @Override
-    public void load(String fileName) throws IOException {
-        // clean table
-        for(int i=0; i<width(); i++) {
-            for(int j=0; j<height(); j++) {
-                // reset the original formula + the current data
-                table[i][j].setData("");
-                table[i][j].getData();
-                table[i][j].setType(0);
+    private int depthCount(int x, int y, int[][] ans, Set<String> visited) {
+        // If already calculated, return the cached value
+        if (ans[x][y] != -2) {
+            return ans[x][y];
+        }
+
+        Cell cell = get(x, y);
+        String data = cell.getData();
+
+        // Handle empty cells or null data
+        if (cell == null || data == null || data.isEmpty()) {
+            ans[x][y] = 0;
+            return 0;
+        }
+
+        // If it's not a formula, depth is 0
+        if (!data.startsWith("=")) {
+            ans[x][y] = 0;
+            return 0;
+        }
+
+        // Create cell identifier
+        String currentCell = x + "," + y;
+
+        // Check for circular dependency
+        if (visited.contains(currentCell)) {
+            ans[x][y] = -1; // Circular dependency
+            return -1;
+        }
+
+        // Add current cell to visited set
+        visited.add(currentCell);
+
+        // Extract cell references
+        String formula = data.substring(1).trim();
+        Pattern cellPattern = Pattern.compile("[A-Z][0-9]+");
+        Matcher matcher = cellPattern.matcher(formula);
+
+        // If no cell references found, it's a constant formula (like "=10+2")
+        if (!matcher.find()) {
+            ans[x][y] = 0;
+            visited.remove(currentCell);
+            return 0;
+        }
+
+        // Reset matcher to start
+        matcher.reset();
+
+        int maxDepth = -1;
+        // Process each dependency
+        while (matcher.find()) {
+            String cellRef = matcher.group();
+            int refX = cellRef.charAt(0) - 'A';
+            int refY = Integer.parseInt(cellRef.substring(1));
+
+            // Skip invalid references
+            if (!isIn(refX, refY)) {
+                continue;
+            }
+
+            int depthOfDependency = depthCount(refX, refY, ans, visited);
+
+            // Propagate circular dependency
+            if (depthOfDependency == -1) {
+                ans[x][y] = -1;
+                visited.remove(currentCell);
+                return -1;
+            }
+
+            maxDepth = Math.max(maxDepth, depthOfDependency);
+        }
+
+        // Remove current cell from visited set
+        visited.remove(currentCell);
+
+        // Set depth as max depth of dependencies + 1
+        ans[x][y] = maxDepth + 1;
+        return ans[x][y];
+    }
+    private int calculateDepth(int x, int y, int[][] depths, boolean[][] visited) {
+        // If already calculated, return the depth
+        if (depths[x][y] >= -1) {
+            return depths[x][y];
+        }
+
+        // Check for circular dependency
+        if (visited[x][y]) {
+            depths[x][y] = -1;
+            return -1;
+        }
+
+        Cell cell = table[x][y];
+        String data = cell.getData();
+
+        // If empty or not a formula, depth is 0
+        if (data == null || data.isEmpty() || !data.startsWith("=")) {
+            depths[x][y] = 0;
+            return 0;
+        }
+
+        visited[x][y] = true;
+        int maxDepth = 0;
+
+        // Find all cell references in the formula
+        Pattern pattern = Pattern.compile("[A-Z][0-9]+");
+        Matcher matcher = pattern.matcher(data);
+
+        while (matcher.find()) {
+            String ref = matcher.group();
+            int col = ref.charAt(0) - 'A';
+            int row = Integer.parseInt(ref.substring(1));
+
+            if (isIn(col, row)) {
+                int depthOfDependency = calculateDepth(col, row, depths, visited);
+                if (depthOfDependency == -1) {
+                    depths[x][y] = -1;
+                    visited[x][y] = false;
+                    return -1;
+                }
+                maxDepth = Math.max(maxDepth, depthOfDependency);
             }
         }
-        //load file
-        File file = new File(fileName);
-        Scanner scanner = new Scanner(file);
-        ArrayList<String> lines = new ArrayList<String>();
-        String[] splitLine;
-        String form;
-        int x,y;
-        while(scanner.hasNextLine()) {
-            lines.add(scanner.nextLine());
+
+        visited[x][y] = false;
+        depths[x][y] = maxDepth + 1;
+        return depths[x][y];
+    }
+
+    @Override
+    public void load(String fileName) throws IOException {
+        // Clear table
+        for (int x = 0; x < width(); x++) {
+            for (int y = 0; y < height(); y++) {
+                set(x, y, ""); // Reset all cells to empty
+            }
         }
-        scanner.close();
-        for(int i = 1; i<lines.size(); i++) {
-            splitLine = lines.get(i).split(",");
-            if(splitLine.length>=3) {
+
+        try (BufferedReader reader = new BufferedReader(new FileReader(fileName))) {
+            String line;
+            boolean isFirstLine = true;
+
+            while ((line = reader.readLine()) != null) {
+                // Skip the header line
+                if (isFirstLine) {
+                    isFirstLine = false;
+                    continue;
+                }
+
+
+                String[] parts = line.split(",");
+                if (parts.length < 3) {
+                    continue;
+                }
+
                 try {
-                    x = Integer.parseInt(splitLine[0]);
-                    y = Integer.parseInt(splitLine[1]);
-                    SCell currentcell = (SCell) table[x][y];
-                    form = splitLine[2];
-                    CellEntry cellEntry = new CellEntry(x,y);
-                    if(cellEntry.isValid() && isIn(x,y)) {
-                        table[x][y].setData(form);
-                        table[x][y].getData();
-                        int type = currentcell.updatetype();
-                        currentcell.setType(type);
+
+                    int x = Integer.parseInt(parts[0]);
+                    int y = Integer.parseInt(parts[1]);
+
+                    // Parse the cell data
+                    String data = parts[2];
+
+                    // Set the cell data if the coordinates are valid
+                    if (isIn(x, y)) {
+                        set(x, y, data);
                     }
                 } catch (NumberFormatException e) {
-
+                    // Skip lines with invalid coordinates
+                    continue;
                 }
             }
         }
@@ -209,94 +364,67 @@ public class Ex2Sheet implements Sheet {
 
     @Override
     public void save(String fileName) throws IOException {
-
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(fileName))) {
+            // Write the header line
+            writer.write("I2CS ArielU: SpreadSheet (Ex2) assignment");
+            writer.newLine();
+            for (int x = 0; x < width(); x++) {
+                for (int y = 0; y < height(); y++) {
+                    Cell cell = get(x, y);
+                    String data = cell.getData();
+                    // Skip empty cells
+                    if (data == null || data.isEmpty()) {
+                        continue;
+                    }
+                    writer.write(x + "," + y + "," + data);
+                    writer.newLine();
+                }
+            }
+        }
     }
 
     @Override
     public String eval(int x, int y) {
-        SCell s = new SCell(table[x][y]);
-        // Use a Set to track visited cells in the current evaluation chain
-        Set<Cell> visitedCells = new HashSet<>();
-
-        // Assuming you get the cell from some data structure (like a 2D array or Map)
-        Cell currentCell = getCell(x, y);
-
-        // If the cell is already in the visited set, it means a circular reference exists
-        if (visitedCells.contains(currentCell)) {
-            // Set the cell's computed value to indicate a circular reference
-            currentCell.setComputedValue(Ex2Utils.ERR_CYCLE);
-            return Ex2Utils.ERR_CYCLE;  // Return the error message for circular reference
+        Cell cell = get(x, y);
+        if (cell == null) {
+            return Ex2Utils.EMPTY_CELL;
         }
 
-        // Add the current cell to the visited set to track it during the current evaluation chain
-        visitedCells.add(currentCell);
-
-        // The normal formula evaluation logic goes here
-        try {
-            String formula = currentCell.getFormula();
-
-            // Now call computeForm() or similar methods for evaluation, passing visitedCells to prevent circular references
-            double result = s.computeForms();  // Your existing formula computation logic
-
-            // If no errors, set the computed value of the cell
-            currentCell.setComputedValue(String.valueOf(result));
-
-            // Return the computed value as a string
-            return String.valueOf(result);
-        } catch (Exception e) {
-            // If an error occurs (like invalid formula or division by zero), set the cell's computed value to error
-            currentCell.setComputedValue(Ex2Utils.ERR_FORM);  // Invalid formula error
-            return Ex2Utils.ERR_FORM;  // Return the error message
-        } finally {
-            // Remove the cell from the visited set once the evaluation is done
-            visitedCells.remove(currentCell);
-        }
-    }
-
-    // a function where I assume the formula has a cell in it ,so I can calculate the depth
-    private int depthCount(int x, int y, String path) {
-        // Detect circular dependencies
-        String currentCell = "[" + x + "," + y + "]";
-        if (path.contains(currentCell)) {
-            System.out.println("Circular dependency detected at: " + currentCell);
-            return Ex2Utils.ERR_CYCLE_FORM ;//// Circular dependency detected
-        }
-        // Validate coordinates
-        if (x < 0 || x >= this.table.length || y < 0 || y >= this.table[0].length) {
-            throw new IllegalArgumentException("Invalid cell coordinates: (" + x + ", " + y + ")");
+        String data = cell.getData();
+        if (data == null || data.isEmpty()) {
+            return Ex2Utils.EMPTY_CELL;
         }
 
-
-        // Get the cell
-        SCell cell = (SCell) this.table[x][y];
-        if (cell == null || !SCell.isForm(cell.getData())) {
-            return 0; // Non-formula cells have depth 0
-        }
-        currentCell = "[" + x + "," + y + "]";
-        if (path.contains(currentCell)) {
-            System.out.println("Circular dependency detected at: " + currentCell);
-            return Ex2Utils.ERR_CYCLE_FORM;//// Circular dependency detected
-        }
-        // Add current cell to path
-        path += "->" + currentCell;
-
-        // Parse dependencies
-        ArrayList<String> dependencies = cell.getDependencies(cell.getData());
-        int maxDepth = 0;
-        for (String dependency : dependencies) {
-            // Convert dependency to coordinates
-            int refX = dependency.charAt(0) - 'A'; // Column index
-            int refY = Integer.parseInt(dependency.substring(1)); // Row index
-
-            // Recursively calculate depth
-            int dependencyDepth = depthCount(refX, refY, path);
-            if (dependencyDepth == -1) {
-                return -1; // Propagate circular dependency
+        // For formula cells
+        if (data.startsWith("=")) {
+            // First check if it's a valid formula format
+            if (!SCell.isForm(data)) {
+                cell.setType(Ex2Utils.ERR_FORM_FORMAT);
+                return Ex2Utils.ERR_FORM;
             }
-            maxDepth = Math.max(maxDepth, dependencyDepth);
+
+            try {
+                // Check for circular dependencies
+                int[][] depths = depth();
+                if (depths[x][y] == -1) {
+                    cell.setType(Ex2Utils.ERR_CYCLE_FORM);
+                    return Ex2Utils.ERR_CYCLE;
+                }
+
+                Double result = SCell.computeForms(data);
+                if (result == Ex2Utils.ERR_FORM_FORMAT) {
+                    cell.setType(Ex2Utils.ERR_FORM_FORMAT);
+                    return Ex2Utils.ERR_FORM;
+                }
+                return String.valueOf(result);
+            } catch (Exception e) {
+                cell.setType(Ex2Utils.ERR_FORM_FORMAT);
+                return Ex2Utils.ERR_FORM;
+            }
         }
 
-        return maxDepth + 1; // Depth is 1 + max depth of dependencies
+        // For non-formula cells
+        return data;
     }
 
     public  String getData (String s){
@@ -304,7 +432,6 @@ public class Ex2Sheet implements Sheet {
         int y = Integer.parseInt(s.substring(1,s.length()-1));
         return table[x][y].getData();
     }
-    //Same method just for the coordinates instead of the strings
     public  String getData (int x , int y){
         return table[x][y].getData();
     }
@@ -315,9 +442,6 @@ public class Ex2Sheet implements Sheet {
         SCell cell = new SCell(table[x][y]);
         // Parse dependencies from the formula
         ArrayList<String> dependencies = cell.getDependencies(formula);
-
-        // Add logic to update dependency graph here
-        // For example, map (x, y) to its dependencies in a data structure
     }
     private void clearDependencies(int x, int y) {
         // Remove (x, y) from the dependency graph
@@ -325,5 +449,4 @@ public class Ex2Sheet implements Sheet {
     public String getCellName(int x, int y) {
         return x - 'A' + String.valueOf(y);
     }
-
 }

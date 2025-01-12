@@ -30,44 +30,42 @@ public class Ex2Test {
         assertTrue(SCell.isForm("=(2+5)*7"));
         assertTrue(SCell.isForm("=(2+(5*(5-1)))*2+(3*(1/2))*12"));
         assertTrue(SCell.isForm("=A0 + B0 * 2"));
+        assertTrue(SCell.isForm("=A0*2"));
 
         assertFalse(SCell.isForm("==-2.99*100"));
         assertFalse(SCell.isForm("=)2("));
         assertFalse(SCell.isForm("-990="));
         assertFalse(SCell.isForm("=-2.99*+100"));
+        assertFalse(SCell.isForm("=7-)-7("));
     }
 
     @Test
     public void testCompute() {
-        SCell s = new SCell() ;
-        s.setFormula("=(2+5)*7");
-        assertEquals(49.0, s.computeForms());
-        s.setFormula("=(((2+5)*7)-4)/2");
-        assertEquals(22.5, s.computeForms());
-        s.setFormula("=(2)");
-        assertEquals(Ex2Utils.ERR_FORM_FORMAT, s.computeForms());
-        s.setFormula("=(2)*9-10+12");
-        assertEquals(-16, s.computeForms());
-        s.setFormula("=(2+(5*(5-1)))*2+(3*(1/2))*12");
-        assertEquals(62, s.computeForms());
+        Ex2Sheet cells = new Ex2Sheet(3, 3);
+        cells.set(0, 0, "=10 +2");        // A0 (0,0) is a constant
+        cells.set(1, 0, "=A0+2");
+        assertEquals(49.0, SCell.computeForms("=(2+5)*7"));
+        assertEquals(22.5, SCell.computeForms("=(((2+5)*7)-4)/2"));
+        assertEquals(2.0, SCell.computeForms("=(2)"));
+        assertEquals(-16, SCell.computeForms("=(-2)*9-10+12"));
+        assertEquals(62, SCell.computeForms("=(2+(5*(5-1)))*2+(3*(1/2))*12"));
     }
 
     @Test
     public void testDepth() {
         Ex2Sheet cells = new Ex2Sheet(3, 3);
-        cells.set(0, 0, "10");        // A0 (0,0) is a constant
-        cells.set(1, 0, "=A0*2");     // B0 (1,0) depends on A0
-        cells.set(1, 1, "=B0+6");// B1 (1,1) is reassigned to depend on B0
-        cells.set(2, 2, "=C2+2");
+        cells.set(0, 0, "=10 +2");        // A0 (0,0) is a constant
+        cells.set(1, 0, "=A0+2");     // B0 (1,0) depends on A0
+        cells.set(1, 1, "=B0+6");     // B1 (1,1) depends on B0
+        cells.set(2,2,"=C2 +1 ");// C2 (2,2) depends on itself
 
         int[][] result = cells.depth();
 
         assertEquals(0, result[0][0]); // A0 has depth 0 (no dependencies)
         assertEquals(1, result[1][0]); // B0 has depth 1 (depends on A0)
         assertEquals(2, result[1][1]); // B1 has depth 2 (depends on B0 -> A0)
-        assertEquals(-1, result[2][2]);
+        assertEquals(-1, result[2][2]); // C2 has depth -1 (circular dependency)
     }
-
     @Test
     public void testEval() {
         Ex2Sheet sheet = new Ex2Sheet(3, 3);
@@ -92,11 +90,11 @@ public class Ex2Test {
         assertEquals("ERR_CYCLE!", sheet.eval(0, 0)); // A0 circular dependency
         assertEquals("ERR_CYCLE!", sheet.eval(1, 1)); // B1 circular dependency
         // Test 5: Invalid formula
-        sheet.set(0, 0, "=//"); // Invalid formula
+        sheet.set(0, 0, "=//");
        assertEquals("ERR_FORM!",sheet.eval(0,0));
 
         // Test 6: Empty cell
-       assertEquals(Ex2Utils.ERR_FORM, sheet.eval(2,2));
+       assertEquals(Ex2Utils.EMPTY_CELL, sheet.eval(2,2));
 
         // Test 7: Parentheses in formula
         sheet.set(2, 0, "=10");           // A0 = 10
@@ -118,7 +116,6 @@ public class Ex2Test {
 
     @Test
     void testInitialization() {
-        // Initialize a 3x3 sheet
         Ex2Sheet sheet = new Ex2Sheet(3, 3);
 
         // Assert dimensions
@@ -132,5 +129,37 @@ public class Ex2Test {
             }
         }
     }
+
+    @Test
+    void testComplexDepthCalculation() {
+
+        Sheet sheet = new Ex2Sheet();
+
+        sheet.set(0, 0, "5");          // A0: depth 0
+        sheet.set(1, 0, "3");          // B0: depth 0
+        sheet.set(2, 0, "=A0+B0");     // C0: depth 1
+        sheet.set(3, 0, "=C0*2");      // D0: depth 2
+        sheet.set(4, 0, "=D0+A0");     // E0: depth 3
+        sheet.set(0, 1, "=E0/2");      // A1: depth 4
+
+
+        int[][] depths = sheet.depth();
+        assertEquals(0, depths[0][0]); // A0
+        assertEquals(0, depths[1][0]); // B0
+        assertEquals(1, depths[2][0]); // C0
+        assertEquals(2, depths[3][0]); // D0
+        assertEquals(3, depths[4][0]); // E0
+        assertEquals(4, depths[0][1]);
+}
+@Test
+    public void testSet(){
+        Sheet sheet = new Ex2Sheet(3,3);
+        sheet.set(0, 0, "=10");
+        sheet.set(1, 1, "=A0+2");
+        sheet.set(2, 1, "=B0+5");
+        assertEquals("=10",sheet.get(0,0).getData());
+        assertEquals("=A0+2",sheet.get(1,1).getData());
+        assertEquals("=B0+5",sheet.get(2,1).getData());
+}
 
 }

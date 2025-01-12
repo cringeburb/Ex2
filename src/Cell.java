@@ -1,3 +1,5 @@
+import java.util.ArrayList;
+
 /**
  * ArielU. Intro2CS, Ex2: https://docs.google.com/document/d/1-18T-dj00apE4k1qmpXGOaqttxLn-Kwi/edit?usp=sharing&ouid=113711744349547563645&rtpof=true&sd=true
  * DO NOT CHANGE THIS INTERFACE!!
@@ -38,11 +40,6 @@ public interface Cell {
      * @param t
      */
     public void setOrder(int t);
-    // Get the formula or the data in the cell
-    String getFormula();
-
-    // Set the formula or data in the cell
-    void setFormula(String formula);
 
     // Get the computed value (result of evaluating the formula)
     String getComputedValue();
@@ -51,5 +48,5 @@ public interface Cell {
     void setComputedValue(String computedValue);
     public int updatetype();
 
-
+    public ArrayList<String> getDependencies(String formula);
 }

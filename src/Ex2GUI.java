@@ -66,10 +66,10 @@ public class Ex2GUI {
 	}
 	private static Color getColorFromType(int t) {
 		Color ans = Color.GRAY;
+		if(t== Ex2Utils.ERR_CYCLE_FORM) {ans= StdDrawEx2.BOOK_RED;}
 		if(t== Ex2Utils.NUMBER) {ans=Color.BLACK;}
 		if(t== Ex2Utils.FORM) {ans=Color.BLUE;}
 		if(t== Ex2Utils.ERR_FORM_FORMAT) {ans=Color.RED;}
-		if(t== Ex2Utils.ERR_CYCLE_FORM) {ans= StdDrawEx2.BOOK_RED;}
 		return ans;
 	}
 
@@ -126,14 +126,15 @@ public class Ex2GUI {
 		}
 		if(table.isIn(xx,yy)) {
 			Cell cc = table.get(xx,yy);
-			String ww = cord+": "+cc.toString()+" : ";
+			cord = new CellEntry(xx, yy);
+			String ww = cord+": "+cc.getData();
 			StdDrawEx2.text(Ex2Utils.GUI_X_START, Ex2Utils.MAX_X-1, ww);
 			StdDrawEx2.show();
 			if(Ex2Utils.Debug) {System.out.println(ww);}
 			String c = StdDrawEx2.getCell(cord,cc.getData());
 			String s1 = table.get(xx,yy).getData();
 			if(c==null) {
-				table.set(xx,yy,s1);
+				//table.set(xx,yy,s1);
 			}
 			else {
 				table.set(xx, yy, c);
